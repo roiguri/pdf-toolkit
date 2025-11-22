@@ -1,16 +1,27 @@
 // src/components/pdf/PDFViewer.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight, Download, Image as ImageIcon, Loader2 } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Image as ImageIcon,
+  Loader2,
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Maximize,
+  Minimize,
+  PanelLeftClose,
+  PanelLeftOpen
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { FileMetadata } from '@/services/firestore';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+import { usePinch } from '@use-gesture/react';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -20,18 +31,126 @@ interface PDFViewerProps {
   showConvertButton?: boolean;
 }
 
+// Zoom constants
+const MIN_SCALE = 0.5;
+const MAX_SCALE = 3;
+const ZOOM_STEP = 0.25;
+
 export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
-  const [scale, setScale] = useState<number>(1.0);
   const [isConverting, setIsConverting] = useState(false);
-  const [pageDimensions, setPageDimensions] = useState<{ width: number; height: number } | null>(null);
-  const pageContainerRef = React.useRef<HTMLDivElement>(null);
+  const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
+  const [scale, setScale] = useState<number>(1);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showThumbnails, setShowThumbnails] = useState(false);
+
+  const pageContainerRef = useRef<HTMLDivElement>(null);
+  const viewerContainerRef = useRef<HTMLDivElement>(null);
+  const pdfContentRef = useRef<HTMLDivElement>(null);
+
+  // Zoom functions
+  const zoomIn = useCallback(() => {
+    setScale(prev => Math.min(MAX_SCALE, prev + ZOOM_STEP));
+  }, []);
+
+  const zoomOut = useCallback(() => {
+    setScale(prev => Math.max(MIN_SCALE, prev - ZOOM_STEP));
+  }, []);
+
+  const resetZoom = useCallback(() => {
+    setScale(1);
+  }, []);
+
+  // Pinch-to-zoom gesture handler
+  usePinch(
+    ({ offset: [s] }) => {
+      setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)));
+    },
+    {
+      target: pageContainerRef,
+      scaleBounds: { min: MIN_SCALE, max: MAX_SCALE },
+      from: () => [scale, 0],
+      eventOptions: { passive: false },
+    }
+  );
+
+  // Mouse wheel zoom (Ctrl+scroll)
+  useEffect(() => {
+    const container = pageContainerRef.current;
+    if (!container) return;
+
+    const handleWheel = (e: WheelEvent) => {
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -ZOOM_STEP : ZOOM_STEP;
+        setScale(prev => Math.max(MIN_SCALE, Math.min(MAX_SCALE, prev + delta)));
+      }
+    };
+
+    container.addEventListener('wheel', handleWheel, { passive: false });
+    return () => container.removeEventListener('wheel', handleWheel);
+  }, []);
+
+  // Fullscreen functions
+  const toggleFullscreen = useCallback(async () => {
+    if (!viewerContainerRef.current) return;
+
+    try {
+      if (!document.fullscreenElement) {
+        await viewerContainerRef.current.requestFullscreen();
+      } else {
+        await document.exitFullscreen();
+      }
+    } catch (error) {
+      console.error('Fullscreen error:', error);
+      toast.error('Failed to toggle fullscreen');
+    }
+  }, []);
+
+  // Listen for fullscreen changes
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+  }, []);
+
+  // Toggle thumbnails sidebar
+  const toggleThumbnails = useCallback(() => {
+    setShowThumbnails(prev => !prev);
+  }, []);
+
+  // Track container width for responsive PDF scaling
+  // We store the base width (at scale 1.0) and apply scale separately
+  useEffect(() => {
+    const container = pageContainerRef.current;
+    if (!container) return;
+
+    const updateWidth = () => {
+      // Subtract padding (p-2 = 8px on each side)
+      const width = container.clientWidth - 16;
+      setContainerWidth(width > 0 ? width : undefined);
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(container);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // Reset zoom when file changes
+  useEffect(() => {
+    setScale(1);
+  }, [file.id]);
 
   const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1); // Reset to first page on new document load
-    setPageDimensions(null); // Reset dimensions on new document
   };
 
   const changePage = (offset: number) => {
@@ -79,10 +198,20 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
 
   return (
-    <div className="flex flex-col items-center space-y-4 w-full">
+    <div
+      ref={viewerContainerRef}
+      className={`flex flex-col w-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
+    >
       {file ? (
         <>
+          {/* Controls toolbar */}
           <div className="flex flex-wrap items-center justify-center gap-2 w-full">
+            {/* Thumbnail toggle */}
+            <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? 'Hide pages' : 'Show pages'}>
+              {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
+
+            {/* Page navigation */}
             <Button onClick={previousPage} disabled={pageNumber <= 1} variant="outline" size="icon">
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -92,6 +221,27 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             <Button onClick={nextPage} disabled={pageNumber >= (numPages || 0)} variant="outline" size="icon">
               <ChevronRight className="h-4 w-4" />
             </Button>
+
+            {/* Zoom controls */}
+            <div className="flex items-center gap-1 ml-2">
+              <Button onClick={zoomOut} disabled={scale <= MIN_SCALE} variant="outline" size="icon" title="Zoom out">
+                <ZoomOut className="h-4 w-4" />
+              </Button>
+              <span className="text-sm font-medium w-14 text-center">{Math.round(scale * 100)}%</span>
+              <Button onClick={zoomIn} disabled={scale >= MAX_SCALE} variant="outline" size="icon" title="Zoom in">
+                <ZoomIn className="h-4 w-4" />
+              </Button>
+              <Button onClick={resetZoom} disabled={scale === 1} variant="outline" size="icon" title="Reset zoom">
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+            </div>
+
+            {/* Fullscreen toggle */}
+            <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+              {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
+            </Button>
+
+            {/* Convert to image button */}
             {showConvertButton && (
               <Button
                 onClick={handleDownloadImage}
@@ -106,49 +256,78 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             )}
           </div>
 
-          <div
-            className="border p-2 rounded-md shadow-md bg-background overflow-auto w-full max-h-[50vh] sm:max-h-[60vh] flex justify-center [scrollbar-gutter:stable]"
-            ref={pageContainerRef}
-          >
-            <Document
-              file={file.downloadURL}
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={
-                <div className="flex items-center justify-center h-full w-full min-h-[500px]">
-                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                </div>
-              }
-              noData={<p>No PDF file selected or available.</p>}
-              error={<p>Failed to load PDF. Check CORS settings or file availability.</p>}
-              className="max-w-full"
+          {/* Main content area with thumbnails sidebar */}
+          <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
+            {/* Thumbnails sidebar */}
+            {showThumbnails && (
+              <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
+                <Document file={file.downloadURL} loading={null}>
+                  {Array.from({ length: numPages || 0 }, (_, index) => (
+                    <button
+                      key={index + 1}
+                      onClick={() => setPageNumber(index + 1)}
+                      className={`w-full p-1 rounded border-2 transition-colors ${
+                        pageNumber === index + 1
+                          ? 'border-primary bg-primary/10'
+                          : 'border-transparent hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <Page
+                        pageNumber={index + 1}
+                        width={100}
+                        renderTextLayer={false}
+                        renderAnnotationLayer={false}
+                        loading={
+                          <div className="h-32 flex items-center justify-center">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          </div>
+                        }
+                      />
+                      <span className="text-xs text-muted-foreground">{index + 1}</span>
+                    </button>
+                  ))}
+                </Document>
+              </div>
+            )}
+
+            {/* PDF viewer */}
+            <div
+              className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${
+                isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
+              }`}
+              ref={pageContainerRef}
+              style={{ touchAction: 'none' }}
             >
               <div
-                style={{
-                  minWidth: pageDimensions?.width ? `${pageDimensions.width}px` : 'auto',
-                  minHeight: pageDimensions?.height ? `${pageDimensions.height}px` : '500px',
-                  display: 'flex',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                }}
+                ref={pdfContentRef}
+                className="w-fit mx-auto"
               >
-                <Page
-                  pageNumber={pageNumber}
-                  scale={scale}
-                  onRenderSuccess={(page) => {
-                    setPageDimensions({ width: page.width, height: page.height });
-                  }}
+                <Document
+                  file={file.downloadURL}
+                  onLoadSuccess={onDocumentLoadSuccess}
                   loading={
-                    <div className="flex items-center justify-center h-full w-full">
+                    <div className="flex items-center justify-center h-full w-full min-h-[500px]">
                       <Loader2 className="h-8 w-8 animate-spin text-primary" />
                     </div>
                   }
-                  renderTextLayer={false} // Optional: Disable text layer for better performance on mobile if needed
-                  renderAnnotationLayer={false} // Optional: Disable annotations
-                  className="max-w-full"
-                  canvasBackground="white"
-                />
+                  noData={<p>No PDF file selected or available.</p>}
+                  error={<p>Failed to load PDF. Check CORS settings or file availability.</p>}
+                >
+                  <Page
+                    pageNumber={pageNumber}
+                    width={containerWidth ? containerWidth * scale : undefined}
+                    loading={
+                      <div className="flex items-center justify-center h-full w-full min-h-[300px]">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    }
+                    renderTextLayer={false}
+                    renderAnnotationLayer={false}
+                    canvasBackground="white"
+                  />
+                </Document>
               </div>
-            </Document>
+            </div>
           </div>
         </>
       ) : (
