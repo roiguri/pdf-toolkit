@@ -9,7 +9,7 @@ import { FileMetadata } from '@/services/firestore';
  * @param mimeType The MIME type of the file.
  */
 export const downloadPdf = (bytes: Uint8Array, filename: string) => {
-  const blob = new Blob([bytes], { type: 'application/pdf' });
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
   const link = document.createElement('a');
   link.href = URL.createObjectURL(blob);
   link.download = filename;
