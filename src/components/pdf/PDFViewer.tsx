@@ -75,6 +75,22 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     }
   );
 
+  // Prevent default pinch-to-zoom on the page (mobile)
+  useEffect(() => {
+    const container = pageContainerRef.current;
+    if (!container) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      // Only prevent default for multi-touch (pinch gestures)
+      if (e.touches.length >= 2) {
+        e.preventDefault();
+      }
+    };
+
+    container.addEventListener('touchstart', handleTouchStart, { passive: false });
+    return () => container.removeEventListener('touchstart', handleTouchStart);
+  }, []);
+
   // Mouse wheel zoom (Ctrl+scroll)
   useEffect(() => {
     const container = pageContainerRef.current;
@@ -296,7 +312,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                 isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
               }`}
               ref={pageContainerRef}
-              style={{ touchAction: 'none' }}
+              style={{ touchAction: 'pan-x pan-y' }}
             >
               <div
                 ref={pdfContentRef}
