@@ -276,7 +276,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
           <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
             {/* Thumbnails sidebar */}
             {showThumbnails && (
-              <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
+              <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${
+                isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
+              }`}>
                 <Document file={file.downloadURL} loading={null}>
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
@@ -290,11 +292,11 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                     >
                       <Page
                         pageNumber={index + 1}
-                        width={100}
+                        width={92}
                         renderTextLayer={false}
                         renderAnnotationLayer={false}
                         loading={
-                          <div className="h-32 flex items-center justify-center">
+                          <div className="h-28 flex items-center justify-center">
                             <Loader2 className="h-4 w-4 animate-spin" />
                           </div>
                         }
