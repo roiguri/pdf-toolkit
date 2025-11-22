@@ -15,6 +15,7 @@ import {
   signInWithPopup,
   signOut,
   signInWithEmailAndPassword,
+  updateProfile,
 } from 'firebase/auth';
 import { auth } from '@/lib/firebase';
 import { useRouter } from 'next/navigation';
@@ -27,6 +28,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  updateDisplayName: (displayName: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -99,12 +101,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updateDisplayName = async (displayName: string) => {
+    if (!currentUser) throw new Error('No user logged in');
+    try {
+      await updateProfile(currentUser, { displayName });
+      // Update Firestore as well
+      const userRef = doc(db, 'users', currentUser.uid);
+      await setDoc(userRef, { displayName }, { merge: true });
+      // Force a re-render by updating state
+      setCurrentUser({ ...currentUser });
+    } catch (error) {
+      console.error('Update Display Name Error:', error);
+      throw error;
+    }
+  };
+
   const value = {
     currentUser,
     loading,
     signInWithGoogle,
     signIn,
     logout,
+    updateDisplayName,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

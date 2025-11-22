@@ -1,7 +1,7 @@
 // src/components/layout/DashboardLayout.tsx
 'use client';
 
-import React, { ReactNode } from 'react';
+import React, { ReactNode, useState } from 'react';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -15,7 +15,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ModeToggle } from './ModeToggle';
-import { FileText, Settings, LogOut, HelpCircle, User } from 'lucide-react';
+import { FileText, Settings, LogOut, User, Calendar, Mail, Trash2, ArrowLeft, Pencil, Check, X } from 'lucide-react';
+import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+
+type MenuView = 'main' | 'profile' | 'settings';
 
 interface DashboardLayoutProps {
   sidebar: ReactNode;
@@ -23,10 +27,56 @@ interface DashboardLayoutProps {
 }
 
 const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
-  const { currentUser, logout } = useAuth();
+  const { currentUser, logout, updateDisplayName } = useAuth();
+  const [menuView, setMenuView] = useState<MenuView>('main');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [editedName, setEditedName] = useState('');
 
-  const UserMenu = () => (
-    <DropdownMenu>
+  const formatDate = (date: string | undefined) => {
+    if (!date) return 'Unknown';
+    return new Intl.DateTimeFormat('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    }).format(new Date(date));
+  };
+
+  const handleClearStorage = () => {
+    try {
+      localStorage.clear();
+      sessionStorage.clear();
+      toast.success('Storage cleared successfully');
+    } catch {
+      toast.error('Failed to clear storage');
+    }
+  };
+
+  const handleStartEditName = () => {
+    setEditedName(currentUser?.displayName || '');
+    setIsEditingName(true);
+  };
+
+  const handleSaveName = async () => {
+    if (!editedName.trim()) {
+      toast.error('Name cannot be empty');
+      return;
+    }
+    try {
+      await updateDisplayName(editedName.trim());
+      toast.success('Display name updated');
+      setIsEditingName(false);
+    } catch {
+      toast.error('Failed to update name');
+    }
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditingName(false);
+    setEditedName('');
+  };
+
+  const userMenuContent = (
+    <DropdownMenu onOpenChange={(open) => !open && setMenuView('main')}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
           <Avatar>
@@ -37,32 +87,104 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" side="right" className="w-56">
-        <DropdownMenuLabel className="font-normal">
-          <div className="flex flex-col space-y-1">
-            <p className="text-sm font-medium leading-none">{currentUser?.displayName}</p>
-            <p className="text-xs leading-none text-muted-foreground">
-              {currentUser?.email}
-            </p>
-          </div>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem>
-          <User className="mr-2 h-4 w-4" />
-          <span>Profile</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <Settings className="mr-2 h-4 w-4" />
-          <span>Settings</span>
-        </DropdownMenuItem>
-        <DropdownMenuItem>
-          <HelpCircle className="mr-2 h-4 w-4" />
-          <span>Support</span>
-        </DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={logout} className="text-red-600">
-          <LogOut className="mr-2 h-4 w-4" />
-          <span>Log out</span>
-        </DropdownMenuItem>
+        {menuView === 'main' && (
+          <>
+            <DropdownMenuLabel className="font-normal">
+              <div className="flex flex-col space-y-1">
+                <p className="text-sm font-medium leading-none">{currentUser?.displayName}</p>
+                <p className="text-xs leading-none text-muted-foreground">
+                  {currentUser?.email}
+                </p>
+              </div>
+            </DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('profile'); }}>
+              <User className="mr-2 h-4 w-4" />
+              <span>Profile</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('settings'); }}>
+              <Settings className="mr-2 h-4 w-4" />
+              <span>Settings</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={logout} className="text-red-600">
+              <LogOut className="mr-2 h-4 w-4" />
+              <span>Log out</span>
+            </DropdownMenuItem>
+          </>
+        )}
+
+        {menuView === 'profile' && (
+          <>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('main'); setIsEditingName(false); }}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              <span>Back</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Account Info</DropdownMenuLabel>
+            <div className="px-2 py-1.5 text-sm">
+              <div className="flex items-center gap-2 mb-2">
+                <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                {isEditingName ? (
+                  <div className="flex items-center gap-1 flex-1">
+                    <Input
+                      value={editedName}
+                      onChange={(e) => setEditedName(e.target.value)}
+                      className="h-6 text-sm py-0 px-1"
+                      autoFocus
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleSaveName();
+                        if (e.key === 'Escape') handleCancelEdit();
+                      }}
+                    />
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleSaveName}>
+                      <Check className="h-3 w-3" />
+                    </Button>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={handleCancelEdit}>
+                      <X className="h-3 w-3" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-1 flex-1">
+                    <span className="text-muted-foreground">
+                      {currentUser?.displayName || 'Not set'}
+                    </span>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={handleStartEditName}>
+                      <Pencil className="h-3 w-3" />
+                    </Button>
+                  </div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 mb-2">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground truncate">
+                  {currentUser?.email}
+                </span>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-muted-foreground" />
+                <span className="text-muted-foreground">
+                  Joined {formatDate(currentUser?.metadata?.creationTime)}
+                </span>
+              </div>
+            </div>
+          </>
+        )}
+
+        {menuView === 'settings' && (
+          <>
+            <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('main'); }}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              <span>Back</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Storage</DropdownMenuLabel>
+            <DropdownMenuItem onClick={handleClearStorage} className="text-red-600">
+              <Trash2 className="mr-2 h-4 w-4" />
+              <span>Clear All Data</span>
+            </DropdownMenuItem>
+          </>
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -85,14 +207,14 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
           {/* Mobile Only: Right side controls */}
           <div className="flex items-center gap-2 sm:hidden">
             <ModeToggle side="bottom" align="start" />
-            <UserMenu />
+            {userMenuContent}
           </div>
         </nav>
 
         {/* Desktop Only: Bottom Controls */}
         <nav className="mt-auto hidden flex-col items-center gap-4 px-2 sm:flex py-4">
           <ModeToggle side="right" align="start" />
-          <UserMenu />
+          {userMenuContent}
         </nav>
       </aside>
 
