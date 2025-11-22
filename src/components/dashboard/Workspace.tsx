@@ -1,7 +1,7 @@
 // src/components/dashboard/Workspace.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
 import { FileMetadata } from '@/services/firestore';
 import ActionToolbar from './ActionToolbar';
@@ -11,7 +11,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getFileDownloadUrl } from '@/services/storage';
 import { splitPdf, mergePdfs, downloadPdf } from '@/lib/pdf-utils';
 import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
@@ -84,16 +83,6 @@ const Workspace = () => {
     }
   };
 
-  const handleConvertPdf = async () => {
-    if (!selectedFile) {
-      toast.error('No PDF file selected to convert.');
-      return;
-    }
-    toast.info('To convert to image, please use the "Convert to Image" button on the PDF viewer itself.', { id: 'convert-info' });
-    // The actual conversion logic (canvas.toDataURL) will be within the PDFViewer or a dedicated component for it.
-    // This is just a placeholder to guide the user.
-  };
-
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0">
@@ -117,21 +106,24 @@ const Workspace = () => {
               <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
             </h3>
             {selectedFile ? (
-              <div className="space-y-2">
-                <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
-                <Input
-                  id="page-ranges"
-                  type="text"
-                  value={splitPageRanges}
-                  onChange={(e) => setSplitPageRanges(e.target.value)}
-                  placeholder="e.g., 1, 3-5, 7"
-                  disabled={isProcessing}
-                />
-                <Button onClick={handleSplitPdf} disabled={isProcessing}>
-                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Split PDF
-                </Button>
-              </div>
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
+                  <Input
+                    id="page-ranges"
+                    type="text"
+                    value={splitPageRanges}
+                    onChange={(e) => setSplitPageRanges(e.target.value)}
+                    placeholder="e.g., 1, 3-5, 7"
+                    disabled={isProcessing}
+                  />
+                  <Button onClick={handleSplitPdf} disabled={isProcessing}>
+                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Split PDF
+                  </Button>
+                </div>
+                <PDFViewer file={selectedFile} showConvertButton={false} />
+              </>
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to split.</p>
             )}
