@@ -1,36 +1,155 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# PDF Toolkit
+
+A modern web application for managing and manipulating PDF files. Built with Next.js, Firebase, and pdf-lib.
+
+## Features
+
+- **User Authentication** - Secure sign-in with Google or email/password via Firebase Auth
+- **Cloud Storage** - Store and manage your PDF files in the cloud with Firebase Storage
+- **PDF Viewer** - Preview PDF documents directly in the browser
+- **Split PDF** - Extract specific pages or page ranges from a PDF (e.g., "1, 3-5, 7")
+- **Merge PDFs** - Combine multiple PDF files into a single document
+- **Convert to Image** - Export PDF pages as images
+- **File Explorer** - Organize and browse your uploaded PDFs
+- **Dark/Light Theme** - Toggle between dark and light modes
+- **Responsive Design** - Works on desktop and mobile devices
+
+## Tech Stack
+
+- **Framework**: Next.js 16 with React 19
+- **Authentication & Storage**: Firebase (Auth, Firestore, Storage)
+- **PDF Processing**: pdf-lib, react-pdf
+- **UI Components**: Radix UI, Tailwind CSS
+- **State Management**: Zustand
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- Node.js 18+
+- npm, yarn, pnpm, or bun
+- Firebase project with Authentication, Firestore, and Storage enabled
+
+### Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/yourusername/pdf-tools.git
+   cd pdf-tools
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   # or
+   yarn install
+   # or
+   pnpm install
+   ```
+
+3. **Set up Firebase Project**
+
+   a. Go to the [Firebase Console](https://console.firebase.google.com/) and create a new project
+
+   b. Enable the following services:
+      - **Authentication**: Enable Google and Email/Password sign-in methods
+      - **Firestore Database**: Create a database (start in production mode)
+      - **Storage**: Set up Cloud Storage
+
+   c. Install Firebase CLI and deploy security rules:
+   ```bash
+   npm install -g firebase-tools
+   firebase login
+   firebase init
+   # Select Firestore and Storage when prompted
+   # Use existing firebase.json configuration
+   firebase deploy --only firestore:rules,storage
+   ```
+
+   d. Create a `.env.local` file in the root directory with your Firebase configuration (find these in Firebase Console > Project Settings > Your Apps):
+   ```env
+   NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
+   NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+   NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
+   NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+   NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
+   NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+   ```
+
+## Security
+
+This application implements proper multi-user security:
+
+### Data Isolation
+- **Firestore**: Each user's files are stored in `users/{userId}/files/`
+- **Storage**: Each user's PDFs are stored in `uploads/{userId}/`
+
+### Security Rules
+The included security rules ensure users can only access their own data:
+
+**Firestore** (`firestore.rules`):
+```javascript
+match /users/{userId} {
+  allow read, write: if request.auth.uid == userId;
+  match /files/{fileId} {
+    allow read, write: if request.auth.uid == userId;
+  }
+}
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+**Storage** (`storage.rules`):
+```javascript
+match /uploads/{userId}/{allPaths=**} {
+  allow read, write: if request.auth.uid == userId;
+}
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+These rules ensure that User A cannot access User B's files - Firebase enforces this at the database level.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+4. **Run the development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   # or
+   pnpm dev
+   ```
 
-## Learn More
+5. **Open the application**
 
-To learn more about Next.js, take a look at the following resources:
+   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### Building for Production
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run build
+npm start
+```
 
-## Deploy on Vercel
+## Usage
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+1. **Sign In** - Use Google or email/password to authenticate
+2. **Upload PDFs** - Drag and drop or select files to upload
+3. **Select a Tool** - Choose Split, Merge, or Convert from the toolbar
+4. **Process Files** - Select files and apply the desired operation
+5. **Download Results** - Save processed PDFs to your device
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Project Structure
+
+```
+src/
+├── app/                 # Next.js app router pages
+├── components/
+│   ├── auth/           # Authentication components
+│   ├── dashboard/      # Dashboard UI (FileExplorer, Workspace, Toolbar)
+│   ├── layout/         # Layout components
+│   ├── pdf/            # PDF viewer component
+│   └── ui/             # Reusable UI components
+├── lib/                # Utilities (Firebase config, PDF utils)
+├── services/           # Firebase services (Firestore, Storage)
+└── store/              # Zustand state management
+```
+
+## License
+
+This project is private.
