@@ -16,6 +16,7 @@ interface AppState {
   setFiles: (files: FileMetadata[]) => void;
   addFileToMergeSelection: (fileId: string) => void;
   removeFileFromMergeSelection: (fileId: string) => void;
+  reorderMergeSelection: (startIndex: number, endIndex: number) => void;
   clearMergeSelection: () => void;
   reset: () => void;
 }
@@ -39,6 +40,13 @@ export const useAppStore = create<AppState>((set) => ({
     set((state) => ({
       mergeSelection: state.mergeSelection.filter((id) => id !== fileId),
     })),
+  reorderMergeSelection: (startIndex, endIndex) =>
+    set((state) => {
+      const result = Array.from(state.mergeSelection);
+      const [removed] = result.splice(startIndex, 1);
+      result.splice(endIndex, 0, removed);
+      return { mergeSelection: result };
+    }),
   clearMergeSelection: () => set({ mergeSelection: [] }),
   reset: () => set(initialState),
 }));

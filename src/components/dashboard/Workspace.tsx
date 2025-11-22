@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useAppStore } from '@/store/useAppStore';
+import { FileMetadata } from '@/services/firestore';
 import ActionToolbar from './ActionToolbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PDFViewer } from '@/components/pdf/PDFViewer'; // Will create PDFViewer
@@ -13,6 +14,7 @@ import { toast } from 'sonner';
 import { getFileDownloadUrl } from '@/services/storage';
 import { splitPdf, mergePdfs, downloadPdf } from '@/lib/pdf-utils';
 import { Label } from '@/components/ui/label';
+import MergeOrderList from './MergeOrderList';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
@@ -20,8 +22,10 @@ const Workspace = () => {
   const [splitPageRanges, setSplitPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Filter files based on mergeSelection
-  const filesToMerge = files.filter((f) => mergeSelection.includes(f.id));
+  // Map mergeSelection to files, preserving the selection order
+  const filesToMerge = mergeSelection
+    .map((id) => files.find((f) => f.id === id))
+    .filter((f): f is FileMetadata => f !== undefined);
 
   const handleSplitPdf = async () => {
     if (!selectedFile) {
@@ -138,13 +142,11 @@ const Workspace = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Merge PDFs</h3>
             {filesToMerge.length > 0 ? (
-              <div className="space-y-2">
-                <p>Selected for merge ({filesToMerge.length}):</p>
-                <ul className="list-inside list-disc">
-                  {filesToMerge.map((file) => (
-                    <li key={file.id} className="truncate">{file.name}</li>
-                  ))}
-                </ul>
+              <div className="space-y-3">
+                <p className="text-sm text-muted-foreground">
+                  Drag to reorder ({filesToMerge.length} selected):
+                </p>
+                <MergeOrderList files={filesToMerge} />
                 <Button onClick={handleMergePdfs} disabled={isProcessing || filesToMerge.length < 2}>
                   {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Merge Selected PDFs

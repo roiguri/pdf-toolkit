@@ -9,6 +9,7 @@ import {
   deleteDoc,
   query,
   where,
+  orderBy,
   onSnapshot,
   serverTimestamp,
 } from 'firebase/firestore';
@@ -75,7 +76,7 @@ export const getUserFilesMetadata = (
     FILES_SUBCOLLECTION
   );
   // Order by uploadedAt for consistent display
-  const q = query(userFilesCollectionRef);
+  const q = query(userFilesCollectionRef, orderBy('uploadedAt', 'asc'));
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const files: FileMetadata[] = [];
