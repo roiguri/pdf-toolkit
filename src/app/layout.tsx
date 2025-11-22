@@ -16,8 +16,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Cloud-Based PDF Toolkit', // Updated title
-  description: 'A web-based SaaS application for PDF management and manipulation.', // Updated description
+  title: 'PDF Toolkit',
+  description: 'A web-based SaaS application for PDF management and manipulation.',
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({
