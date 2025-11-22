@@ -1,0 +1,8 @@
+[
+  {
+    "origin": ["http://localhost:3000", "https://pdf-tools-e8e51.web.app", "https://pdf-tools-e8e51.firebaseapp.com"],
+    "method": ["GET"],
+    "maxAgeSeconds": 3600,
+    "responseHeader": ["Content-Type", "Access-Control-Allow-Origin"]
+  }
+]
