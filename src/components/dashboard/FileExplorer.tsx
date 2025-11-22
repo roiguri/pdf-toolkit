@@ -38,8 +38,10 @@ const FileExplorer = () => {
     addFileToMergeSelection,
     removeFileFromMergeSelection,
     clearMergeSelection,
+    reset,
   } = useAppStore();
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: number }>({}); // {fileName: progress}
+  const [isDeletingAll, setIsDeletingAll] = useState(false);
 
   useEffect(() => {
     if (currentUser?.uid) {
@@ -141,6 +143,30 @@ const FileExplorer = () => {
     }
   };
 
+  const handleDeleteAllFiles = async () => {
+    if (!currentUser?.uid || files.length === 0) return;
+
+    setIsDeletingAll(true);
+    try {
+      // Delete all files from Storage and Firestore
+      await Promise.all(
+        files.map(async (file) => {
+          await deletePdfFile(file.storageRef);
+          await deleteFileMetadata(currentUser.uid, file.id);
+        })
+      );
+
+      // Reset app state
+      reset();
+      toast.success('All files deleted successfully');
+    } catch (error) {
+      console.error('Failed to delete all files:', error);
+      toast.error('Failed to delete some files');
+    } finally {
+      setIsDeletingAll(false);
+    }
+  };
+
   const toggleMergeSelection = (fileId: string) => {
     if (mergeSelection.includes(fileId)) {
       removeFileFromMergeSelection(fileId);
@@ -151,8 +177,37 @@ const FileExplorer = () => {
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
-      <CardHeader className="flex-shrink-0">
+      <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>My PDFs</CardTitle>
+        {files.length > 0 && (
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                disabled={isDeletingAll}
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Delete all files?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  This action cannot be undone. This will permanently delete all {files.length} PDF
+                  file{files.length !== 1 ? 's' : ''} from your account.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleDeleteAllFiles}>
+                  Delete All
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+        )}
       </CardHeader>
       <CardContent className="flex flex-grow flex-col space-y-4 overflow-hidden">
         {/* Drop Zone */}

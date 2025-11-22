@@ -18,6 +18,20 @@ import { ModeToggle } from './ModeToggle';
 import { FileText, Settings, LogOut, User, Calendar, Mail, Trash2, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { useAppStore } from '@/store/useAppStore';
+import { deletePdfFile } from '@/services/storage';
+import { deleteFileMetadata } from '@/services/firestore';
 
 type MenuView = 'main' | 'profile' | 'settings';
 
@@ -28,6 +42,7 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
   const { currentUser, logout, updateDisplayName } = useAuth();
+  const { files, reset } = useAppStore();
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
@@ -41,13 +56,29 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
     }).format(new Date(date));
   };
 
-  const handleClearStorage = () => {
+  const handleClearAllData = async () => {
     try {
+      // Delete all PDF files from Firebase
+      if (currentUser?.uid && files.length > 0) {
+        await Promise.all(
+          files.map(async (file) => {
+            await deletePdfFile(file.storageRef);
+            await deleteFileMetadata(currentUser.uid, file.id);
+          })
+        );
+      }
+
+      // Reset app state
+      reset();
+
+      // Clear browser storage
       localStorage.clear();
       sessionStorage.clear();
-      toast.success('Storage cleared successfully');
-    } catch {
-      toast.error('Failed to clear storage');
+
+      toast.success('All data cleared successfully');
+    } catch (error) {
+      console.error('Failed to clear data:', error);
+      toast.error('Failed to clear some data');
     }
   };
 
@@ -179,10 +210,29 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuLabel>Storage</DropdownMenuLabel>
-            <DropdownMenuItem onClick={handleClearStorage} className="text-red-600">
-              <Trash2 className="mr-2 h-4 w-4" />
-              <span>Clear All Data</span>
-            </DropdownMenuItem>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  <span>Clear All Data</span>
+                </DropdownMenuItem>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Clear all data?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete all your PDF files
+                    {files.length > 0 ? ` (${files.length} file${files.length !== 1 ? 's' : ''})` : ''} and clear all local storage.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAllData}>
+                    Clear All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </>
         )}
       </DropdownMenuContent>
