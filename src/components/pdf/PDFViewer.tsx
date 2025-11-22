@@ -97,7 +97,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                 onClick={handleDownloadImage}
                 disabled={isConverting}
                 variant="outline"
-                className="ml-2 hidden sm:inline-flex"
+                className="ml-2"
               >
                 {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 <ImageIcon className="mr-2 h-4 w-4" />
