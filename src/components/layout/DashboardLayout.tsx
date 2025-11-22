@@ -97,13 +97,13 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       </aside>
 
       {/* Main Content Wrapper */}
-      <div className="flex flex-col sm:pl-16 w-full transition-all duration-300 ease-in-out">
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1">
-          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-1 order-2 lg:order-1">
+      <div className="flex flex-col sm:pl-16 w-full h-[calc(100vh-3.5rem)] sm:h-screen overflow-hidden">
+        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_1fr] lg:grid-rows-1 overflow-y-auto">
+          <div className="lg:col-span-1 order-1 lg:order-1">
              {/* Sidebar content (File Explorer) */}
             {sidebar}
           </div>
-          <div className="grid auto-rows-max items-start gap-4 md:gap-8 lg:col-span-2 order-1 lg:order-2">
+          <div className="lg:col-span-2 order-2 lg:order-2">
              {/* Main Workspace */}
             {main}
           </div>

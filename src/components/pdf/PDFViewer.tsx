@@ -17,9 +17,10 @@ pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/b
 
 interface PDFViewerProps {
   file: FileMetadata;
+  showConvertButton?: boolean;
 }
 
-export const PDFViewer = ({ file }: PDFViewerProps) => {
+export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [scale, setScale] = useState<number>(1.0);
@@ -91,21 +92,22 @@ export const PDFViewer = ({ file }: PDFViewerProps) => {
             <Button onClick={nextPage} disabled={pageNumber >= (numPages || 0)} variant="outline" size="icon">
               <ChevronRight className="h-4 w-4" />
             </Button>
-            <Button
-              onClick={handleDownloadImage}
-              disabled={isConverting}
-              variant="outline"
-              className="ml-2"
-            >
-              {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <ImageIcon className="mr-2 h-4 w-4" />
-              <span className="hidden sm:inline">Convert to Image</span>
-              <span className="sm:hidden">Image</span>
-            </Button>
+            {showConvertButton && (
+              <Button
+                onClick={handleDownloadImage}
+                disabled={isConverting}
+                variant="outline"
+                className="ml-2 hidden sm:inline-flex"
+              >
+                {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <ImageIcon className="mr-2 h-4 w-4" />
+                Convert to Image
+              </Button>
+            )}
           </div>
 
-          <div 
-            className="border p-2 rounded-md shadow-md bg-background overflow-auto w-full max-h-[70vh] flex justify-center [scrollbar-gutter:stable]"
+          <div
+            className="border p-2 rounded-md shadow-md bg-background overflow-auto w-full max-h-[50vh] sm:max-h-[60vh] flex justify-center [scrollbar-gutter:stable]"
             ref={pageContainerRef}
           >
             <Document

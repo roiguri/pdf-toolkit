@@ -10,7 +10,6 @@ import { useAppStore } from '@/store/useAppStore';
 import { getPageCount } from '@/lib/pdf-utils';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Trash2, FileText, Loader2 } from 'lucide-react';
@@ -151,11 +150,11 @@ const FileExplorer = () => {
   };
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader>
+    <Card className="flex h-full flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0">
         <CardTitle>My PDFs</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-grow flex-col space-y-4">
+      <CardContent className="flex flex-grow flex-col space-y-4 overflow-hidden">
         {/* Drop Zone */}
         <div
           {...getRootProps()}
@@ -166,23 +165,24 @@ const FileExplorer = () => {
         >
           <input {...getInputProps()} />
           {isDragActive ? (
-            <p>Drop the PDFs here ...</p>
+            <p className="px-4 text-center text-sm">Drop the PDFs here ...</p>
           ) : (
-            <p>Drag 'n' drop some PDFs here, or click to select files</p>
+            <p className="px-4 text-center text-sm">Drag &apos;n&apos; drop PDFs here, or click to select</p>
           )}
         </div>
 
         {/* Upload progress indicators */}
         {Object.entries(uploadingFiles).map(([fileName, progress]) => (
-          <div key={fileName} className="flex items-center space-x-2 text-sm text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            <span>{fileName}: {progress.toFixed(0)}%</span>
+          <div key={fileName} className="flex items-center space-x-2 text-sm text-muted-foreground min-w-0">
+            <Loader2 className="h-4 w-4 animate-spin flex-shrink-0" />
+            <span className="truncate min-w-0">{fileName}</span>
+            <span className="flex-shrink-0">{progress.toFixed(0)}%</span>
           </div>
         ))}
 
 
         {/* File List */}
-        <ScrollArea className="flex-grow rounded-md border p-2">
+        <div className="flex-grow overflow-y-auto rounded-md border p-2 max-h-[30vh] sm:max-h-none">
           {files.length === 0 ? (
             <p className="p-4 text-center text-muted-foreground">No PDFs uploaded yet.</p>
           ) : (
@@ -191,7 +191,7 @@ const FileExplorer = () => {
                 <div
                   key={file.id}
                   className={cn(
-                    'flex items-center justify-between rounded-md p-3 transition-colors',
+                    'flex items-center gap-2 rounded-md p-3 transition-colors',
                     selectedFileId === file.id ? 'bg-primary/10' : 'hover:bg-accent hover:text-accent-foreground',
                     activeMode === 'merge' && mergeSelection.includes(file.id) && 'bg-blue-100 dark:bg-blue-900',
                     activeMode !== 'merge' && 'cursor-pointer'
@@ -204,24 +204,27 @@ const FileExplorer = () => {
                     }
                   }}
                 >
-                  <div className="flex items-center space-x-2">
-                    {/* Show Checkbox in merge mode, FileText icon otherwise */}
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
                     {activeMode === 'merge' ? (
                       <Checkbox
                         checked={mergeSelection.includes(file.id)}
                         onCheckedChange={() => toggleMergeSelection(file.id)}
                         onClick={(e) => e.stopPropagation()}
-                        className="h-5 w-5"
+                        className="h-5 w-5 flex-shrink-0"
                       />
                     ) : (
                       <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                     )}
-                    <span className="flex-1 truncate text-sm">
+                    <span className="truncate text-sm">
                       {file.name}
-                      {file.pageCount && <span className="ml-2 text-xs text-muted-foreground">({file.pageCount} pages)</span>}
                     </span>
                   </div>
-                  <div className="flex items-center">
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {file.pageCount && (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {file.pageCount}p
+                      </span>
+                    )}
                     <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
@@ -231,7 +234,7 @@ const FileExplorer = () => {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription>
+                          <AlertDialogDescription className="break-all">
                             This action cannot be undone. This will permanently delete your PDF
                             file &quot;{file.name}&quot; from our servers.
                           </AlertDialogDescription>
@@ -249,7 +252,7 @@ const FileExplorer = () => {
               ))}
             </div>
           )}
-        </ScrollArea>
+        </div>
       </CardContent>
     </Card>
   );

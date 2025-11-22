@@ -91,16 +91,16 @@ const Workspace = () => {
   };
 
   return (
-    <Card className="flex h-full flex-col">
-      <CardHeader>
+    <Card className="flex h-full flex-col overflow-hidden">
+      <CardHeader className="flex-shrink-0">
         <CardTitle>Workspace</CardTitle>
       </CardHeader>
-      <CardContent className="flex flex-grow flex-col space-y-4">
+      <CardContent className="flex flex-grow flex-col space-y-4 overflow-y-auto">
         <ActionToolbar />
 
         {activeMode === 'view' && (
           selectedFile ? (
-            <PDFViewer file={selectedFile} />
+            <PDFViewer file={selectedFile} showConvertButton={false} />
           ) : (
             <p className="text-center text-muted-foreground">Select a PDF from the sidebar to view.</p>
           )
@@ -108,7 +108,10 @@ const Workspace = () => {
 
         {activeMode === 'split' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Split PDF: {selectedFile?.name || 'No file selected'}</h3>
+            <h3 className="text-lg font-semibold flex min-w-0">
+              <span className="flex-shrink-0">Split PDF:&nbsp;</span>
+              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
+            </h3>
             {selectedFile ? (
               <div className="space-y-2">
                 <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
@@ -139,7 +142,7 @@ const Workspace = () => {
                 <p>Selected for merge ({filesToMerge.length}):</p>
                 <ul className="list-inside list-disc">
                   {filesToMerge.map((file) => (
-                    <li key={file.id}>{file.name}</li>
+                    <li key={file.id} className="truncate">{file.name}</li>
                   ))}
                 </ul>
                 <Button onClick={handleMergePdfs} disabled={isProcessing || filesToMerge.length < 2}>
@@ -155,7 +158,10 @@ const Workspace = () => {
 
         {activeMode === 'convert' && (
           <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Convert PDF to Image: {selectedFile?.name || 'No file selected'}</h3>
+            <h3 className="text-lg font-semibold flex min-w-0">
+              <span className="flex-shrink-0">Convert PDF to Image:&nbsp;</span>
+              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
+            </h3>
             {selectedFile ? (
               <p className="text-center text-muted-foreground">
                 To convert the current page to an image, please click the "Convert to Image" button within the PDF Viewer below.
