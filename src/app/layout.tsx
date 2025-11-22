@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Toaster } from '@/components/ui/sonner';
+import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -20,6 +21,16 @@ export const metadata: Metadata = {
   description: 'A web-based SaaS application for PDF management and manipulation.',
   icons: {
     icon: '/favicon.svg',
+    apple: '/icons/icon-192x192.svg',
+  },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'PDF Toolkit',
+  },
+  formatDetection: {
+    telephone: false,
   },
 };
 
@@ -40,6 +51,7 @@ export default function RootLayout({
           >
             {children}
             <Toaster />
+            <ServiceWorkerRegistration />
           </ThemeProvider>
         </AuthProvider>
       </body>
