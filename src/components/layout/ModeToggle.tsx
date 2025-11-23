@@ -17,9 +17,10 @@ import { DropdownMenuContentProps } from "@radix-ui/react-dropdown-menu"
 interface ModeToggleProps {
   side?: DropdownMenuContentProps["side"]
   align?: DropdownMenuContentProps["align"]
+  sideOffset?: number
 }
 
-export function ModeToggle({ side = "bottom", align = "end" }: ModeToggleProps) {
+export function ModeToggle({ side = "bottom", align = "end", sideOffset = 4 }: ModeToggleProps) {
   const { setTheme } = useTheme()
 
   return (
@@ -31,7 +32,7 @@ export function ModeToggle({ side = "bottom", align = "end" }: ModeToggleProps) 
           <span className="sr-only">Toggle theme</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align={align} side={side}>
+      <DropdownMenuContent align={align} side={side} sideOffset={sideOffset}>
         <DropdownMenuItem onClick={() => setTheme("light")}>
           Light
         </DropdownMenuItem>

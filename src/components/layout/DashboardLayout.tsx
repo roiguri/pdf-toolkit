@@ -40,9 +40,9 @@ interface DashboardLayoutProps {
   main: ReactNode;
 }
 
-import { getUserSignature, deleteUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
+import { deleteUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
 
-const SignatureManager = ({ currentUser }: { currentUser: any }) => {
+const SignatureManager = ({ currentUser }: { currentUser: { uid: string } | null }) => {
   const [signature, setSignature] = useState<UserSignature | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -161,7 +161,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
     setEditedName('');
   };
 
-  const userMenuContent = (
+  const renderUserMenu = (side: "right" | "bottom" | "top" | "left", align: "end" | "start" | "center" = "end") => (
     <DropdownMenu onOpenChange={(open) => !open && setMenuView('main')}>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
@@ -172,7 +172,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
           <span className="sr-only">Toggle user menu</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" side="right" className="w-56">
+      <DropdownMenuContent align={align} side={side} className="w-56">
         {menuView === 'main' && (
           <>
             <DropdownMenuLabel className="font-normal">
@@ -317,15 +317,15 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
 
           {/* Mobile Only: Right side controls */}
           <div className="flex items-center gap-2 sm:hidden">
-            <ModeToggle side="bottom" align="start" />
-            {userMenuContent}
+            <ModeToggle side="bottom" align="end" />
+            {renderUserMenu("bottom", "end")}
           </div>
         </nav>
 
         {/* Desktop Only: Bottom Controls */}
         <nav className="mt-auto hidden flex-col items-center gap-4 px-2 sm:flex py-4">
-          <ModeToggle side="right" align="start" />
-          {userMenuContent}
+          <ModeToggle side="left" align="end" />
+          {renderUserMenu("right", "end")}
         </nav>
       </aside>
 
