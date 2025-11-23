@@ -313,15 +313,28 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   }, [activeMode, activeEditTool, pageNumber, addAnnotation, setSelectedAnnotationId]);
 
   // Handle saving signature from modal
-  const handleSaveSignature = useCallback((signatureDataUrl: string) => {
+  const handleSaveSignature = useCallback((signatureDataUrl: string, width: number, height: number) => {
     if (!pendingSignaturePosition) return;
 
-    // Use relative dimensions (default 120x60 pixels converted to relative)
+    // Calculate dimensions to fit within 120x60 box while maintaining aspect ratio
+    const MAX_WIDTH = 120;
+    const MAX_HEIGHT = 60;
+    const aspectRatio = width / height;
+
+    let targetWidth = MAX_WIDTH;
+    let targetHeight = targetWidth / aspectRatio;
+
+    if (targetHeight > MAX_HEIGHT) {
+      targetHeight = MAX_HEIGHT;
+      targetWidth = targetHeight * aspectRatio;
+    }
+
     // Use unscaled dimensions for consistent sizing regardless of zoom level
     const unscaledWidth = canvasDimensions.width / scale;
     const unscaledHeight = canvasDimensions.height / scale;
-    const relativeWidth = unscaledWidth > 0 ? 120 / unscaledWidth : 0.15;
-    const relativeHeight = unscaledHeight > 0 ? 60 / unscaledHeight : 0.08;
+
+    const relativeWidth = unscaledWidth > 0 ? targetWidth / unscaledWidth : 0.15;
+    const relativeHeight = unscaledHeight > 0 ? targetHeight / unscaledHeight : 0.08;
 
     // Center the signature on the click point
     const centeredPosition = {

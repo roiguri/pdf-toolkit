@@ -5,7 +5,7 @@ import { X, Trash2, Check } from 'lucide-react';
 interface SignatureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (signatureDataUrl: string) => void;
+  onSave: (signatureDataUrl: string, width: number, height: number) => void;
 }
 
 const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave }) => {
@@ -21,9 +21,10 @@ const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave
     if (signatureRef.current?.isEmpty()) {
       return;
     }
-    const dataUrl = signatureRef.current?.toDataURL('image/png');
-    if (dataUrl) {
-      onSave(dataUrl);
+    const trimmedCanvas = signatureRef.current?.getTrimmedCanvas();
+    if (trimmedCanvas) {
+      const dataUrl = trimmedCanvas.toDataURL('image/png');
+      onSave(dataUrl, trimmedCanvas.width, trimmedCanvas.height);
       onClose();
     }
   };
