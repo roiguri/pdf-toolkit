@@ -23,17 +23,7 @@ const SignatureAnnotation: React.FC<SignatureAnnotationProps> = ({
   onDelete,
   onUpdate,
 }) => {
-  // Default size in relative coordinates (0-1)
-  const defaultRelativeWidth = 200 / canvasWidth;
-  const defaultRelativeHeight = 100 / canvasHeight;
 
-  // Get current size (relative coordinates)
-  const relativeWidth = annotation.style?.width || defaultRelativeWidth;
-  const relativeHeight = annotation.style?.height || defaultRelativeHeight;
-
-  // Convert to absolute pixels for display
-  const displayWidth = relativeWidth * canvasWidth;
-  const displayHeight = relativeHeight * canvasHeight;
 
   return (
     <DraggableAnnotation

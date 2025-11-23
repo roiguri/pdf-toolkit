@@ -42,7 +42,6 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
   const [size, setSize] = useState({
     width: annotation.style?.width || 0,
     height: annotation.style?.height || 0,
-    fontSize: annotation.style?.fontSize || 16,
   });
 
   // Sync with props when not dragging
@@ -51,7 +50,6 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
     setSize({
       width: annotation.style?.width || 0,
       height: annotation.style?.height || 0,
-      fontSize: annotation.style?.fontSize || 16,
     });
   }, [annotation]);
 
@@ -87,7 +85,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
   );
 
   // Store initial state for resize
-  const initialResizeState = useRef<{ width: number; height: number; fontSize: number } | null>(null);
+  const initialResizeState = useRef<{ width: number; height: number } | null>(null);
 
   const handleResizeStart = () => {
     if (containerRef.current) {
@@ -95,18 +93,12 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
       initialResizeState.current = {
         width: rect.width,
         height: rect.height,
-        fontSize: size.fontSize,
       };
     }
   };
 
   // Resize handler
   const handleResize = (deltaX: number, deltaY: number, handle: ResizeHandle) => {
-    // Current values
-    const currentWidth = size.width > 0 ? size.width * canvasWidth : 0; // 0 means auto/text
-    const currentHeight = size.height > 0 ? size.height * canvasHeight : 0;
-    const currentFontSize = size.fontSize;
-
     // For images/signatures (width > 0)
     const relativeDeltaX = deltaX / canvasWidth;
     const relativeDeltaY = deltaY / canvasHeight;
@@ -151,7 +143,6 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
         ...annotation.style,
         width: size.width,
         height: size.height,
-        fontSize: size.fontSize,
       },
     });
   };
@@ -166,7 +157,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
         top: position.y * canvasHeight,
         width: size.width > 0 ? size.width * canvasWidth : 'auto',
         height: size.height > 0 ? size.height * canvasHeight : 'auto',
-        fontSize: size.fontSize * scale,
+
         cursor: isSelected ? 'move' : 'pointer',
         touchAction: 'none', // Critical: prevents browser scrolling when dragging this element
       }}
