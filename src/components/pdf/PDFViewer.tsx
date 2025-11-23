@@ -22,6 +22,11 @@ import {
 import { toast } from 'sonner';
 import { FileMetadata } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
+import { useAppStore } from '@/store/useAppStore';
+import AnnotationOverlay from './AnnotationOverlay';
+import SignatureModal from './SignatureModal';
+import EditToolbar from './EditToolbar';
+import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -44,10 +49,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const [scale, setScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
+  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [showSignatureModal, setShowSignatureModal] = useState(false);
+  const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
 
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
+
+  const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId } = useAppStore();
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -212,6 +222,116 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     }
   };
 
+  // Track canvas dimensions for annotation overlay
+  useEffect(() => {
+    const container = pdfContentRef.current;
+    if (!container) return;
+
+    const updateCanvasDimensions = () => {
+      const canvas = container.querySelector('canvas');
+      if (canvas) {
+        // Use getBoundingClientRect for actual display dimensions
+        const rect = canvas.getBoundingClientRect();
+        setCanvasDimensions({
+          width: rect.width,
+          height: rect.height,
+        });
+      }
+    };
+
+    // Initial update
+    updateCanvasDimensions();
+
+    // Update on mutations (page render complete)
+    const observer = new MutationObserver(updateCanvasDimensions);
+    observer.observe(container, { childList: true, subtree: true });
+
+    return () => observer.disconnect();
+  }, [pageNumber, scale, containerWidth]);
+
+  // Handle adding annotation when clicking on overlay
+  const handleAddAnnotation = useCallback((position: { x: number; y: number }) => {
+    if (activeMode !== 'edit') return;
+
+    if (activeEditTool === 'text') {
+      const id = crypto.randomUUID();
+      const newAnnotation = {
+        id,
+        pageNumber,
+        type: 'text' as const,
+        position,
+        content: '',
+        style: { fontSize: 16, fontColor: '#000000' },
+      };
+      addAnnotation(newAnnotation);
+      setSelectedAnnotationId(id); // Auto-select to trigger edit mode
+    } else if (activeEditTool === 'signature') {
+      setPendingSignaturePosition(position);
+      setShowSignatureModal(true);
+    }
+  }, [activeMode, activeEditTool, pageNumber, addAnnotation, setSelectedAnnotationId]);
+
+  // Handle saving signature from modal
+  const handleSaveSignature = useCallback((signatureDataUrl: string) => {
+    if (!pendingSignaturePosition) return;
+
+    // Use relative dimensions (default 200x100 pixels converted to relative)
+    // Use unscaled dimensions for consistent sizing regardless of zoom level
+    const unscaledWidth = canvasDimensions.width / scale;
+    const unscaledHeight = canvasDimensions.height / scale;
+    const relativeWidth = unscaledWidth > 0 ? 200 / unscaledWidth : 0.2;
+    const relativeHeight = unscaledHeight > 0 ? 100 / unscaledHeight : 0.1;
+
+    const newAnnotation = {
+      id: crypto.randomUUID(),
+      pageNumber,
+      type: 'signature' as const,
+      position: pendingSignaturePosition,
+      content: signatureDataUrl,
+      style: { width: relativeWidth, height: relativeHeight },
+    };
+    addAnnotation(newAnnotation);
+    setPendingSignaturePosition(null);
+  }, [pendingSignaturePosition, pageNumber, addAnnotation, canvasDimensions, scale]);
+
+  // Handle exporting PDF with annotations
+  const handleExportWithAnnotations = useCallback(async () => {
+    if (annotations.length === 0) {
+      toast.info('No annotations to export');
+      return;
+    }
+
+    try {
+      toast.info('Exporting PDF with annotations...', { id: 'export-pdf' });
+
+      // Pass unscaled dimensions for proper coordinate mapping
+      const unscaledDimensions = {
+        width: canvasDimensions.width / scale,
+        height: canvasDimensions.height / scale,
+      };
+
+      const pdfBytes = await embedAnnotationsInPdf(
+        file.downloadURL,
+        annotations,
+        unscaledDimensions
+      );
+
+      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${file.name}_annotated.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      toast.success('PDF exported successfully!', { id: 'export-pdf' });
+    } catch (error) {
+      console.error('Error exporting PDF:', error);
+      toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
+    }
+  }, [annotations, file, canvasDimensions]);
 
   return (
     <div
@@ -272,6 +392,13 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             )}
           </div>
 
+          {/* Edit toolbar */}
+          {activeMode === 'edit' && (
+            <div className="flex justify-center">
+              <EditToolbar onExport={handleExportWithAnnotations} />
+            </div>
+          )}
+
           {/* Main content area with thumbnails sidebar */}
           <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
             {/* Thumbnails sidebar */}
@@ -331,18 +458,29 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                   noData={<p>No PDF file selected or available.</p>}
                   error={<p>Failed to load PDF. Check CORS settings or file availability.</p>}
                 >
-                  <Page
-                    pageNumber={pageNumber}
-                    width={containerWidth ? containerWidth * scale : undefined}
-                    loading={
-                      <div className="flex items-center justify-center h-full w-full min-h-[300px]">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    }
-                    renderTextLayer={false}
-                    renderAnnotationLayer={false}
-                    canvasBackground="white"
-                  />
+                  <div className="relative">
+                    <Page
+                      pageNumber={pageNumber}
+                      width={containerWidth ? containerWidth * scale : undefined}
+                      loading={
+                        <div className="flex items-center justify-center h-full w-full min-h-[300px]">
+                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                        </div>
+                      }
+                      renderTextLayer={false}
+                      renderAnnotationLayer={false}
+                      canvasBackground="white"
+                    />
+                    {canvasDimensions.width > 0 && (
+                      <AnnotationOverlay
+                        pageNumber={pageNumber}
+                        canvasWidth={canvasDimensions.width}
+                        canvasHeight={canvasDimensions.height}
+                        scale={scale}
+                        onAddAnnotation={handleAddAnnotation}
+                      />
+                    )}
+                  </div>
                 </Document>
               </div>
             </div>
@@ -351,6 +489,16 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       ) : (
         <p className="text-muted-foreground">Select a PDF to view.</p>
       )}
+
+      {/* Signature modal */}
+      <SignatureModal
+        isOpen={showSignatureModal}
+        onClose={() => {
+          setShowSignatureModal(false);
+          setPendingSignaturePosition(null);
+        }}
+        onSave={handleSaveSignature}
+      />
     </div>
   );
 };

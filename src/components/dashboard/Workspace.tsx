@@ -167,6 +167,20 @@ const Workspace = () => {
             {selectedFile && <PDFViewer file={selectedFile} />}
           </div>
         )}
+
+        {activeMode === 'edit' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex min-w-0">
+              <span className="flex-shrink-0">Edit PDF:&nbsp;</span>
+              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
+            </h3>
+            {selectedFile ? (
+              <PDFViewer file={selectedFile} showConvertButton={false} />
+            ) : (
+              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to edit.</p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

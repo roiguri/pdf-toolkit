@@ -2,14 +2,33 @@
 import { create } from 'zustand';
 import { FileMetadata } from '@/services/firestore'; // Assuming FileMetadata is defined here
 
-export type AppMode = 'view' | 'split' | 'merge' | 'convert';
+export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit';
+
+export type AnnotationType = 'text' | 'signature';
+
+export interface Annotation {
+  id: string;
+  pageNumber: number;
+  type: AnnotationType;
+  position: { x: number; y: number }; // Relative coordinates (0-1)
+  content: string; // Text content or base64 signature image
+  style?: {
+    fontSize?: number;
+    fontColor?: string;
+    width?: number;
+    height?: number;
+  };
+}
 
 interface AppState {
   selectedFileId: string | null;
   activeMode: AppMode;
   files: FileMetadata[];
   mergeSelection: string[];
-  // Other potential UI states like loading, errors etc. can be added later
+  // Annotation state
+  annotations: Annotation[];
+  activeEditTool: AnnotationType;
+  selectedAnnotationId: string | null;
 
   setSelectedFileId: (id: string | null) => void;
   setActiveMode: (mode: AppMode) => void;
@@ -18,6 +37,13 @@ interface AppState {
   removeFileFromMergeSelection: (fileId: string) => void;
   reorderMergeSelection: (startIndex: number, endIndex: number) => void;
   clearMergeSelection: () => void;
+  // Annotation actions
+  setActiveEditTool: (tool: AnnotationType) => void;
+  addAnnotation: (annotation: Annotation) => void;
+  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
+  deleteAnnotation: (id: string) => void;
+  setSelectedAnnotationId: (id: string | null) => void;
+  clearAnnotations: () => void;
   reset: () => void;
 }
 
@@ -26,6 +52,9 @@ const initialState = {
   activeMode: 'view' as AppMode,
   files: [],
   mergeSelection: [],
+  annotations: [] as Annotation[],
+  activeEditTool: 'text' as AnnotationType,
+  selectedAnnotationId: null,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -48,5 +77,22 @@ export const useAppStore = create<AppState>((set) => ({
       return { mergeSelection: result };
     }),
   clearMergeSelection: () => set({ mergeSelection: [] }),
+  // Annotation actions
+  setActiveEditTool: (tool) => set({ activeEditTool: tool }),
+  addAnnotation: (annotation) =>
+    set((state) => ({ annotations: [...state.annotations, annotation] })),
+  updateAnnotation: (id, updates) =>
+    set((state) => ({
+      annotations: state.annotations.map((ann) =>
+        ann.id === id ? { ...ann, ...updates } : ann
+      ),
+    })),
+  deleteAnnotation: (id) =>
+    set((state) => ({
+      annotations: state.annotations.filter((ann) => ann.id !== id),
+      selectedAnnotationId: state.selectedAnnotationId === id ? null : state.selectedAnnotationId,
+    })),
+  setSelectedAnnotationId: (id) => set({ selectedAnnotationId: id }),
+  clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
   reset: () => set(initialState),
 }));

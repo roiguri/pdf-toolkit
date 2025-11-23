@@ -1,6 +1,7 @@
 // src/lib/pdf-utils.ts
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
 import { FileMetadata } from '@/services/firestore';
+import { Annotation } from '@/store/useAppStore';
 
 /**
  * Downloads a file to the user's browser.
@@ -122,3 +123,111 @@ export const mergePdfs = async (
 // Note: Convert to Image logic will primarily be handled by react-pdf rendering to canvas
 // and then using canvas.toDataURL, as outlined in the design document.
 // This utility will focus on pdf-lib capabilities.
+
+/**
+ * Embeds annotations (text and signatures) into a PDF document.
+ * @param pdfUrl The URL of the PDF to annotate.
+ * @param annotations The annotations to embed.
+ * @param canvasDimensions The dimensions of the rendered canvas (for coordinate conversion).
+ * @returns The bytes of the annotated PDF.
+ */
+export const embedAnnotationsInPdf = async (
+  pdfUrl: string,
+  annotations: Annotation[],
+  canvasDimensions: { width: number; height: number }
+): Promise<Uint8Array> => {
+  // Fetch the original PDF
+  const response = await fetch(pdfUrl);
+  const arrayBuffer = await response.arrayBuffer();
+  const pdfDoc = await PDFDocument.load(arrayBuffer);
+
+  // Embed the font for text annotations
+  const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Process each annotation
+  for (const annotation of annotations) {
+    const pageIndex = annotation.pageNumber - 1; // pdf-lib is 0-indexed
+    if (pageIndex < 0 || pageIndex >= pdfDoc.getPageCount()) continue;
+
+    const page = pdfDoc.getPage(pageIndex);
+    const { width: pageWidth, height: pageHeight } = page.getSize();
+
+    // Convert relative coordinates (0-1) to PDF coordinates
+    // Note: PDF coordinates start from bottom-left, canvas from top-left
+    const pdfX = annotation.position.x * pageWidth;
+    const pdfY = pageHeight - (annotation.position.y * pageHeight);
+
+    if (annotation.type === 'text') {
+      const fontSize = annotation.style?.fontSize || 16;
+      const fontColor = annotation.style?.fontColor || '#000000';
+
+      // Parse hex color to RGB
+      const hexToRgb = (hex: string) => {
+        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+        return result ? {
+          r: parseInt(result[1], 16) / 255,
+          g: parseInt(result[2], 16) / 255,
+          b: parseInt(result[3], 16) / 255,
+        } : { r: 0, g: 0, b: 0 };
+      };
+
+      const color = hexToRgb(fontColor);
+
+      // Scale font size based on canvas to PDF ratio
+      const scaleFactor = pageHeight / canvasDimensions.height;
+      const scaledFontSize = fontSize * scaleFactor;
+
+      // Account for text box padding (px-2 = 8px, py-1 = 4px in Tailwind)
+      // Slight adjustment for font rendering differences
+      const paddingX = 6 * scaleFactor;
+      const paddingY = 4 * scaleFactor;
+
+      // Draw text (adjust for padding and text baseline)
+      // Text is positioned from its baseline in PDF coordinates
+      page.drawText(annotation.content, {
+        x: pdfX + paddingX,
+        y: pdfY - paddingY - scaledFontSize, // Adjust for padding and text baseline
+        size: scaledFontSize,
+        font,
+        color: rgb(color.r, color.g, color.b),
+      });
+    } else if (annotation.type === 'signature') {
+      // Get signature dimensions (relative coordinates)
+      const storedWidth = annotation.style?.width || 0;
+      const storedHeight = annotation.style?.height || 0;
+
+      // Detect if values are legacy absolute pixels (> 1) or new relative (0-1)
+      const relativeWidth = storedWidth > 1 ? storedWidth / canvasDimensions.width : storedWidth;
+      const relativeHeight = storedHeight > 1 ? storedHeight / canvasDimensions.height : storedHeight;
+
+      // Convert relative dimensions to PDF dimensions
+      const scaledWidth = relativeWidth * pageWidth;
+      const scaledHeight = relativeHeight * pageHeight;
+
+      try {
+        // Convert base64 data URL to bytes
+        const base64Data = annotation.content.split(',')[1];
+        const imageBytes = Uint8Array.from(atob(base64Data), c => c.charCodeAt(0));
+
+        // Embed the image (PNG format from signature canvas)
+        const image = await pdfDoc.embedPng(imageBytes);
+
+        // Draw the signature image
+        // Small offset adjustment to align with visual position
+        const scaleFactor = pageHeight / canvasDimensions.height;
+        const offsetX = 2 * scaleFactor;
+
+        page.drawImage(image, {
+          x: pdfX + offsetX,
+          y: pdfY - scaledHeight, // Adjust for image positioning
+          width: scaledWidth,
+          height: scaledHeight,
+        });
+      } catch (error) {
+        console.error('Error embedding signature:', error);
+      }
+    }
+  }
+
+  return pdfDoc.save();
+};

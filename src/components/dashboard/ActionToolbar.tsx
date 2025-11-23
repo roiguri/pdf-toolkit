@@ -4,7 +4,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppStore, AppMode } from '@/store/useAppStore';
-import { SplitSquareVertical, Combine, Image } from 'lucide-react';
+import { SplitSquareVertical, Combine, Image, PenLine } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ActionToolbar = () => {
@@ -39,6 +39,13 @@ const ActionToolbar = () => {
       >
         <Image className="mr-2 h-4 w-4" />
         Convert
+      </Button>
+      <Button
+        variant={activeMode === 'edit' ? 'secondary' : 'ghost'}
+        onClick={() => handleModeChange('edit')}
+      >
+        <PenLine className="mr-2 h-4 w-4" />
+        Edit
       </Button>
     </div>
   );
