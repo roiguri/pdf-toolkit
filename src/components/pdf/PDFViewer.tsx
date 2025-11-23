@@ -276,21 +276,30 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     const container = pdfContentRef.current;
     if (!container) return;
 
+    let timeoutId: NodeJS.Timeout;
+
     const updateCanvasDimensions = () => {
-      const canvas = container.querySelector('canvas');
-      if (canvas) {
-        // Use getBoundingClientRect for actual display dimensions
-        const rect = canvas.getBoundingClientRect();
-        setCanvasDimensions(prev => {
-          if (Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1) {
-            return prev;
-          }
-          return {
-            width: rect.width,
-            height: rect.height,
-          };
-        });
-      }
+      // Clear any pending updates
+      if (timeoutId) clearTimeout(timeoutId);
+
+      // Debounce to prevent excessive updates during mobile browser UI changes
+      timeoutId = setTimeout(() => {
+        const canvas = container.querySelector('canvas');
+        if (canvas) {
+          // Use getBoundingClientRect for actual display dimensions
+          const rect = canvas.getBoundingClientRect();
+          setCanvasDimensions(prev => {
+            // Only update if dimensions changed significantly (> 1px)
+            if (Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1) {
+              return prev;
+            }
+            return {
+              width: rect.width,
+              height: rect.height,
+            };
+          });
+        }
+      }, 100); // 100ms debounce
     };
 
     // Initial update
@@ -300,7 +309,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     const observer = new MutationObserver(updateCanvasDimensions);
     observer.observe(container, { childList: true, subtree: true });
 
-    return () => observer.disconnect();
+    // Also update on window resize for mobile orientation changes
+    window.addEventListener('resize', updateCanvasDimensions);
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+      observer.disconnect();
+      window.removeEventListener('resize', updateCanvasDimensions);
+    };
   }, [pageNumber, scale, containerWidth]);
 
   // Handle adding annotation when clicking on overlay

@@ -75,6 +75,16 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
       onClick={handleOverlayClick}
     >
       {pageAnnotations.map((annotation) => {
+        // Validate canvas dimensions
+        if (canvasWidth <= 0 || canvasHeight <= 0) return null;
+
+        // Validate annotation position is within bounds
+        if (annotation.position.x < 0 || annotation.position.x > 1 ||
+          annotation.position.y < 0 || annotation.position.y > 1) {
+          console.warn(`Annotation ${annotation.id} has invalid position:`, annotation.position);
+          return null;
+        }
+
         const absoluteX = annotation.position.x * canvasWidth;
         const absoluteY = annotation.position.y * canvasHeight;
 

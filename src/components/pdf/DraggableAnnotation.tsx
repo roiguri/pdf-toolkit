@@ -59,14 +59,13 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
       if (first) {
         onSelect();
         return {
-          initialX: position.x * canvasWidth,
-          initialY: position.y * canvasHeight,
+          initialPos: position,
         };
       }
 
-      const { initialX, initialY } = memo;
-      const newX = (initialX + mx) / canvasWidth;
-      const newY = (initialY + my) / canvasHeight;
+      const { initialPos } = memo;
+      const newX = initialPos.x + mx / canvasWidth;
+      const newY = initialPos.y + my / canvasHeight;
 
       // Update local state immediately for UI
       setPosition({ x: newX, y: newY });
@@ -84,8 +83,13 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
     }
   );
 
-  // Store initial state for resize
-  const initialResizeState = useRef<{ width: number; height: number } | null>(null);
+  // Store initial state for resize, including canvas dimensions snapshot
+  const initialResizeState = useRef<{
+    width: number;
+    height: number;
+    canvasWidth: number;
+    canvasHeight: number;
+  } | null>(null);
 
   const handleResizeStart = () => {
     if (containerRef.current) {
@@ -93,15 +97,24 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
       initialResizeState.current = {
         width: rect.width,
         height: rect.height,
+        canvasWidth,
+        canvasHeight,
       };
     }
   };
 
   // Resize handler
   const handleResize = (deltaX: number, deltaY: number, handle: ResizeHandle) => {
+    // Use canvas dimensions from resize start to prevent shifts during resize
+    const resizeCanvasWidth = initialResizeState.current?.canvasWidth || canvasWidth;
+    const resizeCanvasHeight = initialResizeState.current?.canvasHeight || canvasHeight;
+
+    // Prevent division by zero
+    if (resizeCanvasWidth === 0 || resizeCanvasHeight === 0) return;
+
     // For images/signatures (width > 0)
-    const relativeDeltaX = deltaX / canvasWidth;
-    const relativeDeltaY = deltaY / canvasHeight;
+    const relativeDeltaX = deltaX / resizeCanvasWidth;
+    const relativeDeltaY = deltaY / resizeCanvasHeight;
 
     let newW = size.width;
     let newH = size.height;
@@ -110,26 +123,30 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
 
     switch (handle) {
       case 'bottom-right':
-        newW = Math.max(minWidth / canvasWidth, size.width + relativeDeltaX);
-        newH = Math.max(minHeight / canvasHeight, size.height + relativeDeltaY);
+        newW = Math.max(minWidth / resizeCanvasWidth, size.width + relativeDeltaX);
+        newH = Math.max(minHeight / resizeCanvasHeight, size.height + relativeDeltaY);
         break;
       case 'bottom-left':
-        newW = Math.max(minWidth / canvasWidth, size.width - relativeDeltaX);
-        newH = Math.max(minHeight / canvasHeight, size.height + relativeDeltaY);
+        newW = Math.max(minWidth / resizeCanvasWidth, size.width - relativeDeltaX);
+        newH = Math.max(minHeight / resizeCanvasHeight, size.height + relativeDeltaY);
         newX = position.x + relativeDeltaX;
         break;
       case 'top-right':
-        newW = Math.max(minWidth / canvasWidth, size.width + relativeDeltaX);
-        newH = Math.max(minHeight / canvasHeight, size.height - relativeDeltaY);
+        newW = Math.max(minWidth / resizeCanvasWidth, size.width + relativeDeltaX);
+        newH = Math.max(minHeight / resizeCanvasHeight, size.height - relativeDeltaY);
         newY = position.y + relativeDeltaY;
         break;
       case 'top-left':
-        newW = Math.max(minWidth / canvasWidth, size.width - relativeDeltaX);
-        newH = Math.max(minHeight / canvasHeight, size.height - relativeDeltaY);
+        newW = Math.max(minWidth / resizeCanvasWidth, size.width - relativeDeltaX);
+        newH = Math.max(minHeight / resizeCanvasHeight, size.height - relativeDeltaY);
         newX = position.x + relativeDeltaX;
         newY = position.y + relativeDeltaY;
         break;
     }
+
+    // Clamp position to valid range (0-1)
+    newX = Math.max(0, Math.min(1 - newW, newX));
+    newY = Math.max(0, Math.min(1 - newH, newY));
 
     setPosition({ x: newX, y: newY });
     setSize(prev => ({ ...prev, width: newW, height: newH }));
@@ -153,10 +170,10 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
       {...bindDrag()}
       className={`absolute ${isSelected ? 'z-50' : 'z-10'} touch-none select-none`}
       style={{
-        left: position.x * canvasWidth,
-        top: position.y * canvasHeight,
-        width: size.width > 0 ? size.width * canvasWidth : 'auto',
-        height: size.height > 0 ? size.height * canvasHeight : 'auto',
+        left: canvasWidth > 0 ? position.x * canvasWidth : 0,
+        top: canvasHeight > 0 ? position.y * canvasHeight : 0,
+        width: size.width > 0 && canvasWidth > 0 ? size.width * canvasWidth : 'auto',
+        height: size.height > 0 && canvasHeight > 0 ? size.height * canvasHeight : 'auto',
 
         cursor: isSelected ? 'move' : 'pointer',
         touchAction: 'none', // Critical: prevents browser scrolling when dragging this element
