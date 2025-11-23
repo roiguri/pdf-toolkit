@@ -74,8 +74,35 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
   // Pinch-to-zoom gesture handler
   usePinch(
-    ({ offset: [s] }) => {
-      setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)));
+    ({ offset: [s], memo, active, last }) => {
+      if (active) {
+        // During gesture: apply CSS transform for smooth 60fps performance
+        if (pageContainerRef.current) {
+          // We use the memo to store the initial scale when the gesture starts
+          const initialScale = memo ?? scale;
+
+          // Calculate the new visual scale
+          // We clamp it visually but allow some overscroll feel
+          const currentScale = s;
+
+          // Apply transform
+          pageContainerRef.current.style.transform = `scale(${currentScale / initialScale})`;
+          pageContainerRef.current.style.transformOrigin = '0 0';
+
+          return initialScale;
+        }
+      } else if (last) {
+        // Gesture ended: commit the new scale
+        // Reset transform
+        if (pageContainerRef.current) {
+          pageContainerRef.current.style.transform = '';
+        }
+
+        // Update React state to trigger re-render at new resolution
+        setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)));
+      }
+
+      return memo;
     },
     {
       target: pageContainerRef,
@@ -97,8 +124,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       }
     };
 
+    // Add touch-action: none to prevent browser zooming/panning interference
+    container.style.touchAction = 'none';
+
     container.addEventListener('touchstart', handleTouchStart, { passive: false });
-    return () => container.removeEventListener('touchstart', handleTouchStart);
+    return () => {
+      container.removeEventListener('touchstart', handleTouchStart);
+      container.style.touchAction = '';
+    };
   }, []);
 
   // Mouse wheel zoom (Ctrl+scroll)
@@ -403,19 +436,17 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
           <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
             {/* Thumbnails sidebar */}
             {showThumbnails && (
-              <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${
-                isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-              }`}>
+              <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
+                }`}>
                 <Document file={file.downloadURL} loading={null}>
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
                       key={index + 1}
                       onClick={() => setPageNumber(index + 1)}
-                      className={`w-full p-1 rounded border-2 transition-colors ${
-                        pageNumber === index + 1
+                      className={`w-full p-1 rounded border-2 transition-colors ${pageNumber === index + 1
                           ? 'border-primary bg-primary/10'
                           : 'border-transparent hover:border-muted-foreground/30'
-                      }`}
+                        }`}
                     >
                       <Page
                         pageNumber={index + 1}
@@ -437,9 +468,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
             {/* PDF viewer */}
             <div
-              className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${
-                isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-              }`}
+              className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
+                }`}
               ref={pageContainerRef}
               style={{ touchAction: 'pan-x pan-y' }}
             >

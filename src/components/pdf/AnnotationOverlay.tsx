@@ -80,17 +80,11 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
             <TextAnnotation
               key={annotation.id}
               annotation={annotation}
-              x={absoluteX}
-              y={absoluteY}
               scale={scale}
               isSelected={selectedAnnotationId === annotation.id}
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
               onSelect={() => handleAnnotationSelect(annotation.id)}
-              onDrag={(pos) => handleAnnotationDrag(annotation.id, {
-                x: pos.x / canvasWidth,
-                y: pos.y / canvasHeight,
-              })}
               onDelete={() => handleAnnotationDelete(annotation.id)}
               onUpdate={(updates) => handleAnnotationUpdate(annotation.id, updates)}
             />
@@ -102,17 +96,11 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
             <SignatureAnnotation
               key={annotation.id}
               annotation={annotation}
-              x={absoluteX}
-              y={absoluteY}
               scale={scale}
               isSelected={selectedAnnotationId === annotation.id}
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
               onSelect={() => handleAnnotationSelect(annotation.id)}
-              onDrag={(pos) => handleAnnotationDrag(annotation.id, {
-                x: pos.x / canvasWidth,
-                y: pos.y / canvasHeight,
-              })}
               onDelete={() => handleAnnotationDelete(annotation.id)}
               onUpdate={(updates) => handleAnnotationUpdate(annotation.id, updates)}
             />

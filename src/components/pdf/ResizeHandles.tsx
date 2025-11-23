@@ -20,63 +20,40 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
   const [activeHandle, setActiveHandle] = useState<ResizeHandle | null>(null);
   const [startPos, setStartPos] = useState({ x: 0, y: 0 });
 
-  const handleMouseDown = (e: React.MouseEvent, handle: ResizeHandle) => {
+  const handlePointerDown = (e: React.PointerEvent, handle: ResizeHandle) => {
     e.stopPropagation();
     e.preventDefault();
     setActiveHandle(handle);
     setStartPos({ x: e.clientX, y: e.clientY });
-  };
-
-  const handleTouchStart = (e: React.TouchEvent, handle: ResizeHandle) => {
-    e.stopPropagation();
-    // e.preventDefault(); // Prevent scrolling while resizing
-    setActiveHandle(handle);
-    const touch = e.touches[0];
-    if (touch) {
-      setStartPos({ x: touch.clientX, y: touch.clientY });
-    }
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 
   useEffect(() => {
     if (!activeHandle) return;
 
-    const handleMouseMove = (e: MouseEvent) => {
+    const handlePointerMove = (e: PointerEvent) => {
+      e.preventDefault();
       const deltaX = e.clientX - startPos.x;
       const deltaY = e.clientY - startPos.y;
       onResize(deltaX, deltaY, activeHandle);
+      // We don't update startPos here for cumulative delta, or we do?
+      // The original code updated startPos, implying delta is per-frame.
+      // Let's keep it consistent: delta is "movement" since last event.
       setStartPos({ x: e.clientX, y: e.clientY });
     };
 
-    const handleTouchMove = (e: TouchEvent) => {
-      e.preventDefault(); // Prevent scrolling while resizing
-      const touch = e.touches[0];
-      if (!touch) return;
-      const deltaX = touch.clientX - startPos.x;
-      const deltaY = touch.clientY - startPos.y;
-      onResize(deltaX, deltaY, activeHandle);
-      setStartPos({ x: touch.clientX, y: touch.clientY });
-    };
-
-    const handleMouseUp = () => {
+    const handlePointerUp = (e: PointerEvent) => {
       setActiveHandle(null);
       onResizeEnd();
+      (e.target as HTMLElement).releasePointerCapture(e.pointerId);
     };
 
-    const handleTouchEnd = () => {
-      setActiveHandle(null);
-      onResizeEnd();
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-    window.addEventListener('touchmove', handleTouchMove, { passive: false });
-    window.addEventListener('touchend', handleTouchEnd);
+    window.addEventListener('pointermove', handlePointerMove);
+    window.addEventListener('pointerup', handlePointerUp);
 
     return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('mouseup', handleMouseUp);
-      window.removeEventListener('touchmove', handleTouchMove);
-      window.removeEventListener('touchend', handleTouchEnd);
+      window.removeEventListener('pointermove', handlePointerMove);
+      window.removeEventListener('pointerup', handlePointerUp);
     };
   }, [activeHandle, startPos, onResize, onResizeEnd]);
 
@@ -116,10 +93,10 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
             width: handleSize,
             height: handleSize,
             cursor,
+            touchAction: 'none', // Prevent scrolling while resizing
             ...style,
           }}
-          onMouseDown={(e) => handleMouseDown(e, position)}
-          onTouchStart={(e) => handleTouchStart(e, position)}
+          onPointerDown={(e) => handlePointerDown(e, position)}
         />
       ))}
     </>
