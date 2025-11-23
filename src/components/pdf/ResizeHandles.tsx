@@ -9,12 +9,14 @@ interface ResizeHandlesProps {
     handle: ResizeHandle
   ) => void;
   onResizeEnd: () => void;
+  onResizeStart?: () => void;
   scale: number;
 }
 
 const ResizeHandles: React.FC<ResizeHandlesProps> = ({
   onResize,
   onResizeEnd,
+  onResizeStart,
   scale,
 }) => {
   const [activeHandle, setActiveHandle] = useState<ResizeHandle | null>(null);
@@ -25,6 +27,7 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
     e.preventDefault();
     setActiveHandle(handle);
     setStartPos({ x: e.clientX, y: e.clientY });
+    if (onResizeStart) onResizeStart();
     (e.target as HTMLElement).setPointerCapture(e.pointerId);
   };
 

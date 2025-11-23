@@ -53,7 +53,7 @@ const initialState = {
   files: [],
   mergeSelection: [],
   annotations: [] as Annotation[],
-  activeEditTool: 'text' as AnnotationType,
+  activeEditTool: 'signature' as AnnotationType,
   selectedAnnotationId: null,
 };
 

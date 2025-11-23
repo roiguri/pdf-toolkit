@@ -86,41 +86,26 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
     }
   );
 
+  // Store initial state for resize
+  const initialResizeState = useRef<{ width: number; height: number; fontSize: number } | null>(null);
+
+  const handleResizeStart = () => {
+    if (containerRef.current) {
+      const rect = containerRef.current.getBoundingClientRect();
+      initialResizeState.current = {
+        width: rect.width,
+        height: rect.height,
+        fontSize: size.fontSize,
+      };
+    }
+  };
+
   // Resize handler
   const handleResize = (deltaX: number, deltaY: number, handle: ResizeHandle) => {
     // Current values
     const currentWidth = size.width > 0 ? size.width * canvasWidth : 0; // 0 means auto/text
     const currentHeight = size.height > 0 ? size.height * canvasHeight : 0;
     const currentFontSize = size.fontSize;
-
-    // For text (width=0), we scale font size
-    if (annotation.type === 'text') {
-      // Calculate effective delta based on handle position
-      // For bottom/right handles, positive delta means grow
-      // For top/left handles, negative delta means grow
-      let effectiveDelta = 0;
-
-      switch (handle) {
-        case 'bottom-right':
-          effectiveDelta = (deltaX + deltaY) / 2;
-          break;
-        case 'bottom-left':
-          effectiveDelta = (-deltaX + deltaY) / 2;
-          break;
-        case 'top-right':
-          effectiveDelta = (deltaX - deltaY) / 2;
-          break;
-        case 'top-left':
-          effectiveDelta = (-deltaX - deltaY) / 2;
-          break;
-      }
-
-      const scaleFactor = 1 + effectiveDelta / 200;
-      const newFontSize = Math.max(8, Math.min(200, currentFontSize * scaleFactor));
-
-      setSize(prev => ({ ...prev, fontSize: newFontSize }));
-      return;
-    }
 
     // For images/signatures (width > 0)
     const relativeDeltaX = deltaX / canvasWidth;
@@ -159,6 +144,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
   };
 
   const handleResizeEnd = () => {
+    initialResizeState.current = null;
     onUpdate({
       position,
       style: {
@@ -182,7 +168,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
         height: size.height > 0 ? size.height * canvasHeight : 'auto',
         fontSize: size.fontSize * scale,
         cursor: isSelected ? 'move' : 'pointer',
-        touchAction: 'none',
+        touchAction: 'none', // Critical: prevents browser scrolling when dragging this element
       }}
       onClick={(e) => {
         e.stopPropagation();
@@ -196,6 +182,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
           <>
             <ResizeHandles
               onResize={handleResize}
+              onResizeStart={handleResizeStart}
               onResizeEnd={handleResizeEnd}
               scale={scale}
             />

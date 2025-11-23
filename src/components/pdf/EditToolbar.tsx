@@ -10,7 +10,6 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
   const { activeEditTool, setActiveEditTool, annotations, clearAnnotations } = useAppStore();
 
   const tools: { type: AnnotationType; icon: React.ReactNode; label: string }[] = [
-    { type: 'text', icon: <Type size={18} />, label: 'Text' },
     { type: 'signature', icon: <PenTool size={18} />, label: 'Signature' },
   ];
 
@@ -21,11 +20,10 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
           <button
             key={tool.type}
             onClick={() => setActiveEditTool(tool.type)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm transition-colors ${
-              activeEditTool === tool.type
-                ? 'bg-blue-600 text-white'
-                : 'bg-white text-gray-700 hover:bg-gray-200'
-            }`}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm transition-colors ${activeEditTool === tool.type
+              ? 'bg-blue-600 text-white'
+              : 'bg-white text-gray-700 hover:bg-gray-200'
+              }`}
             title={tool.label}
           >
             {tool.icon}

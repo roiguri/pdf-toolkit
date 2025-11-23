@@ -41,6 +41,21 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const ZOOM_STEP = 0.25;
 
+const PageLoading = (
+  <div className="flex items-center justify-center h-full w-full min-h-[300px]">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
+const DocumentLoading = (
+  <div className="flex items-center justify-center h-full w-full min-h-[500px]">
+    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  </div>
+);
+
+const DocumentNoData = <p>No PDF file selected or available.</p>;
+const DocumentError = <p>Failed to load PDF. Check CORS settings or file availability.</p>;
+
 export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
@@ -57,7 +72,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
 
-  const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId } = useAppStore();
+  const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId, selectedAnnotationId, deleteAnnotation } = useAppStore();
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -118,14 +133,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     if (!container) return;
 
     const handleTouchStart = (e: TouchEvent) => {
-      // Only prevent default for multi-touch (pinch gestures)
+      // Only prevent default for multi-touch (pinch gestures) to allow usePinch to handle it
       if (e.touches.length >= 2) {
         e.preventDefault();
       }
     };
 
-    // Add touch-action: none to prevent browser zooming/panning interference
-    container.style.touchAction = 'none';
+    // Allow panning but prevent browser zoom
+    container.style.touchAction = 'pan-x pan-y';
 
     container.addEventListener('touchstart', handleTouchStart, { passive: false });
     return () => {
@@ -207,10 +222,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     setScale(1);
   }, [file.id]);
 
-  const onDocumentLoadSuccess = ({ numPages }: { numPages: number }) => {
+  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setPageNumber(1); // Reset to first page on new document load
-  };
+  }, []);
 
   const changePage = (offset: number) => {
     setPageNumber((prevPageNumber) => {
@@ -265,9 +280,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       if (canvas) {
         // Use getBoundingClientRect for actual display dimensions
         const rect = canvas.getBoundingClientRect();
-        setCanvasDimensions({
-          width: rect.width,
-          height: rect.height,
+        setCanvasDimensions(prev => {
+          if (Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1) {
+            return prev;
+          }
+          return {
+            width: rect.width,
+            height: rect.height,
+          };
         });
       }
     };
@@ -286,19 +306,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const handleAddAnnotation = useCallback((position: { x: number; y: number }) => {
     if (activeMode !== 'edit') return;
 
-    if (activeEditTool === 'text') {
-      const id = crypto.randomUUID();
-      const newAnnotation = {
-        id,
-        pageNumber,
-        type: 'text' as const,
-        position,
-        content: '',
-        style: { fontSize: 16, fontColor: '#000000' },
-      };
-      addAnnotation(newAnnotation);
-      setSelectedAnnotationId(id); // Auto-select to trigger edit mode
-    } else if (activeEditTool === 'signature') {
+    if (activeEditTool === 'signature') {
       setPendingSignaturePosition(position);
       setShowSignatureModal(true);
     }
@@ -308,18 +316,24 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const handleSaveSignature = useCallback((signatureDataUrl: string) => {
     if (!pendingSignaturePosition) return;
 
-    // Use relative dimensions (default 200x100 pixels converted to relative)
+    // Use relative dimensions (default 120x60 pixels converted to relative)
     // Use unscaled dimensions for consistent sizing regardless of zoom level
     const unscaledWidth = canvasDimensions.width / scale;
     const unscaledHeight = canvasDimensions.height / scale;
-    const relativeWidth = unscaledWidth > 0 ? 200 / unscaledWidth : 0.2;
-    const relativeHeight = unscaledHeight > 0 ? 100 / unscaledHeight : 0.1;
+    const relativeWidth = unscaledWidth > 0 ? 120 / unscaledWidth : 0.15;
+    const relativeHeight = unscaledHeight > 0 ? 60 / unscaledHeight : 0.08;
+
+    // Center the signature on the click point
+    const centeredPosition = {
+      x: pendingSignaturePosition.x - relativeWidth / 2,
+      y: pendingSignaturePosition.y - relativeHeight / 2,
+    };
 
     const newAnnotation = {
       id: crypto.randomUUID(),
       pageNumber,
       type: 'signature' as const,
-      position: pendingSignaturePosition,
+      position: centeredPosition,
       content: signatureDataUrl,
       style: { width: relativeWidth, height: relativeHeight },
     };
@@ -365,6 +379,23 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
     }
   }, [annotations, file, canvasDimensions]);
+
+  // Handle delete key for selected annotation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (activeMode !== 'edit' || !selectedAnnotationId) return;
+
+      if (e.key === 'Delete' || e.key === 'Backspace') {
+        e.preventDefault();
+        deleteAnnotation(selectedAnnotationId);
+        setSelectedAnnotationId(null);
+        toast.success('Annotation deleted');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeMode, selectedAnnotationId, deleteAnnotation, setSelectedAnnotationId]);
 
   return (
     <div
@@ -444,8 +475,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                       key={index + 1}
                       onClick={() => setPageNumber(index + 1)}
                       className={`w-full p-1 rounded border-2 transition-colors ${pageNumber === index + 1
-                          ? 'border-primary bg-primary/10'
-                          : 'border-transparent hover:border-muted-foreground/30'
+                        ? 'border-primary bg-primary/10'
+                        : 'border-transparent hover:border-muted-foreground/30'
                         }`}
                     >
                       <Page
@@ -480,23 +511,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                 <Document
                   file={file.downloadURL}
                   onLoadSuccess={onDocumentLoadSuccess}
-                  loading={
-                    <div className="flex items-center justify-center h-full w-full min-h-[500px]">
-                      <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                    </div>
-                  }
-                  noData={<p>No PDF file selected or available.</p>}
-                  error={<p>Failed to load PDF. Check CORS settings or file availability.</p>}
+                  loading={DocumentLoading}
+                  noData={DocumentNoData}
+                  error={DocumentError}
                 >
                   <div className="relative">
                     <Page
                       pageNumber={pageNumber}
                       width={containerWidth ? containerWidth * scale : undefined}
-                      loading={
-                        <div className="flex items-center justify-center h-full w-full min-h-[300px]">
-                          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                        </div>
-                      }
+                      loading={PageLoading}
                       renderTextLayer={false}
                       renderAnnotationLayer={false}
                       canvasBackground="white"

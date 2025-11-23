@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAppStore, Annotation } from '@/store/useAppStore';
-import TextAnnotation from './TextAnnotation';
+
 import SignatureAnnotation from './SignatureAnnotation';
 
 interface AnnotationOverlayProps {
@@ -40,7 +40,10 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
     const y = (e.clientY - rect.top) / rect.height;
 
     // Deselect any selected annotation when clicking empty space
-    setSelectedAnnotationId(null);
+    if (selectedAnnotationId) {
+      setSelectedAnnotationId(null);
+      return;
+    }
 
     onAddAnnotation({ x, y });
   };
@@ -74,22 +77,6 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
       {pageAnnotations.map((annotation) => {
         const absoluteX = annotation.position.x * canvasWidth;
         const absoluteY = annotation.position.y * canvasHeight;
-
-        if (annotation.type === 'text') {
-          return (
-            <TextAnnotation
-              key={annotation.id}
-              annotation={annotation}
-              scale={scale}
-              isSelected={selectedAnnotationId === annotation.id}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-              onSelect={() => handleAnnotationSelect(annotation.id)}
-              onDelete={() => handleAnnotationDelete(annotation.id)}
-              onUpdate={(updates) => handleAnnotationUpdate(annotation.id, updates)}
-            />
-          );
-        }
 
         if (annotation.type === 'signature') {
           return (
