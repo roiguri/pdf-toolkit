@@ -11,7 +11,9 @@ import {
   where,
   orderBy,
   onSnapshot,
+
   serverTimestamp,
+  setDoc,
 } from 'firebase/firestore';
 import { User as FirebaseAuthUser } from 'firebase/auth';
 
@@ -106,4 +108,94 @@ export const updateFileMetadata = async (
 export const deleteFileMetadata = async (userId: string, fileId: string) => {
   const fileDocRef = doc(db, USERS_COLLECTION, userId, FILES_SUBCOLLECTION, fileId);
   await deleteDoc(fileDocRef);
+};
+
+const SIGNATURES_SUBCOLLECTION = 'signatures';
+const DEFAULT_SIGNATURE_ID = 'default';
+
+export interface UserSignature {
+  id: string;
+  dataUrl: string;
+  width: number;
+  height: number;
+  updatedAt: Date;
+}
+
+// Save user signature
+export const saveUserSignature = async (
+  userId: string,
+  dataUrl: string,
+  width: number,
+  height: number
+) => {
+  const signatureDocRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    SIGNATURES_SUBCOLLECTION,
+    DEFAULT_SIGNATURE_ID
+  );
+
+  await setDoc(signatureDocRef, {
+    dataUrl,
+    width,
+    height,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+// Get user signature
+export const getUserSignature = async (userId: string): Promise<UserSignature | null> => {
+  const signatureDocRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    SIGNATURES_SUBCOLLECTION,
+    DEFAULT_SIGNATURE_ID
+  );
+  const docSnap = await getDoc(signatureDocRef);
+
+  if (docSnap.exists()) {
+    return {
+      id: docSnap.id,
+      ...(docSnap.data() as Omit<UserSignature, 'id'>),
+    };
+  }
+  return null;
+};
+
+// Delete user signature
+export const deleteUserSignature = async (userId: string) => {
+  const signatureDocRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    SIGNATURES_SUBCOLLECTION,
+    DEFAULT_SIGNATURE_ID
+  );
+  await deleteDoc(signatureDocRef);
+};
+// Subscribe to user signature updates
+export const subscribeToUserSignature = (
+  userId: string,
+  callback: (signature: UserSignature | null) => void
+) => {
+  const signatureDocRef = doc(
+    db,
+    USERS_COLLECTION,
+    userId,
+    SIGNATURES_SUBCOLLECTION,
+    DEFAULT_SIGNATURE_ID
+  );
+
+  return onSnapshot(signatureDocRef, (docSnap) => {
+    if (docSnap.exists()) {
+      callback({
+        id: docSnap.id,
+        ...(docSnap.data() as Omit<UserSignature, 'id'>),
+      });
+    } else {
+      callback(null);
+    }
+  });
 };

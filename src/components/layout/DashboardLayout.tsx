@@ -40,6 +40,61 @@ interface DashboardLayoutProps {
   main: ReactNode;
 }
 
+import { getUserSignature, deleteUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
+
+const SignatureManager = ({ currentUser }: { currentUser: any }) => {
+  const [signature, setSignature] = useState<UserSignature | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  React.useEffect(() => {
+    if (currentUser?.uid) {
+      const unsubscribe = subscribeToUserSignature(currentUser.uid, (sig) => {
+        setSignature(sig);
+        setLoading(false);
+      });
+      return () => unsubscribe();
+    }
+  }, [currentUser]);
+
+  const handleDelete = async () => {
+    if (!currentUser?.uid) return;
+    try {
+      await deleteUserSignature(currentUser.uid);
+      setSignature(null);
+      toast.success('Signature deleted');
+    } catch (error) {
+      toast.error('Failed to delete signature');
+    }
+  };
+
+  if (loading) return <div className="text-xs text-muted-foreground">Loading signature...</div>;
+
+  if (!signature) {
+    return <div className="text-xs text-muted-foreground italic">No saved signature</div>;
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="border rounded bg-white p-2 flex justify-center">
+        <img
+          src={signature.dataUrl}
+          alt="Saved Signature"
+          className="max-h-16 object-contain"
+        />
+      </div>
+      <Button
+        variant="destructive"
+        size="sm"
+        onClick={handleDelete}
+        className="w-full h-7 text-xs"
+      >
+        <Trash2 className="mr-2 h-3 w-3" />
+        Delete Signature
+      </Button>
+    </div>
+  );
+};
+
 const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
   const { currentUser, logout, updateDisplayName } = useAuth();
   const { files, reset } = useAppStore();
@@ -199,6 +254,12 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
                 </span>
               </div>
             </div>
+
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel>Saved Signature</DropdownMenuLabel>
+            <div className="px-2 py-1.5">
+              <SignatureManager currentUser={currentUser} />
+            </div>
           </>
         )}
 
@@ -236,14 +297,14 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
           </>
         )}
       </DropdownMenuContent>
-    </DropdownMenu>
+    </DropdownMenu >
   );
 
   return (
     <div className="flex min-h-screen w-full flex-col sm:flex-row">
       {/* Sidebar Navigation - Fixed on Desktop, Top bar on Mobile */}
       <aside className="sm:fixed sm:inset-y-0 sm:left-0 sm:z-10 sm:flex sm:w-16 sm:flex-col sm:border-r bg-background sm:items-center sm:py-4">
-        
+
         {/* Logo */}
         <nav className="flex sm:flex-col items-center gap-4 px-4 sm:px-0 w-full sm:w-auto justify-between sm:justify-start h-14 sm:h-auto border-b sm:border-0">
           <Link
@@ -272,11 +333,11 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       <div className="flex flex-col sm:pl-16 w-full h-[calc(100vh-3.5rem)] sm:h-screen overflow-hidden">
         <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_1fr] lg:grid-rows-1 overflow-y-auto">
           <div className="lg:col-span-1 order-1 lg:order-1">
-             {/* Sidebar content (File Explorer) */}
+            {/* Sidebar content (File Explorer) */}
             {sidebar}
           </div>
           <div className="lg:col-span-2 order-2 lg:order-2">
-             {/* Main Workspace */}
+            {/* Main Workspace */}
             {main}
           </div>
         </main>

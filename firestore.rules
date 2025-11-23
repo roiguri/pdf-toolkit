@@ -15,6 +15,11 @@ service cloud.firestore {
       match /files/{fileId} {
         allow read, write: if isOwner(userId);
       }
+
+      // Allow access to signatures
+      match /signatures/{signatureId} {
+        allow read, write: if isOwner(userId);
+      }
     }
   }
 }

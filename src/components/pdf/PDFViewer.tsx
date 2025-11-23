@@ -20,13 +20,14 @@ import {
   PanelLeftOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { FileMetadata } from '@/services/firestore';
+import { FileMetadata, saveUserSignature, getUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
 import { useAppStore } from '@/store/useAppStore';
 import AnnotationOverlay from './AnnotationOverlay';
 import SignatureModal from './SignatureModal';
 import EditToolbar from './EditToolbar';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -65,12 +66,12 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
-  const [showSignatureModal, setShowSignatureModal] = useState(false);
   const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
 
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
+  const { currentUser } = useAuth();
 
   const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId, selectedAnnotationId, deleteAnnotation } = useAppStore();
 
@@ -308,13 +309,43 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
     if (activeEditTool === 'signature') {
       setPendingSignaturePosition(position);
-      setShowSignatureModal(true);
     }
   }, [activeMode, activeEditTool, pageNumber, addAnnotation, setSelectedAnnotationId]);
 
+  const [savedSignature, setSavedSignature] = useState<UserSignature | null>(null);
+
+  useEffect(() => {
+    if (currentUser?.uid) {
+      const unsubscribe = subscribeToUserSignature(currentUser.uid, (signature) => {
+        setSavedSignature(signature);
+      });
+      return () => unsubscribe();
+    } else {
+      setSavedSignature(null);
+    }
+  }, [currentUser]);
+
   // Handle saving signature from modal
-  const handleSaveSignature = useCallback((signatureDataUrl: string, width: number, height: number) => {
+  const handleSaveSignature = useCallback(async (signatureDataUrl: string, width: number, height: number, saveToProfile: boolean) => {
     if (!pendingSignaturePosition) return;
+
+    if (saveToProfile && currentUser) {
+      try {
+        await saveUserSignature(currentUser.uid, signatureDataUrl, width, height);
+        toast.success('Signature saved to profile');
+        // Update local state immediately
+        setSavedSignature({
+          id: 'default',
+          dataUrl: signatureDataUrl,
+          width,
+          height,
+          updatedAt: new Date()
+        });
+      } catch (error) {
+        console.error('Error saving signature:', error);
+        toast.error('Failed to save signature to profile');
+      }
+    }
 
     // Calculate dimensions to fit within 120x60 box while maintaining aspect ratio
     const MAX_WIDTH = 120;
@@ -352,7 +383,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     };
     addAnnotation(newAnnotation);
     setPendingSignaturePosition(null);
-  }, [pendingSignaturePosition, pageNumber, addAnnotation, canvasDimensions, scale]);
+  }, [pendingSignaturePosition, pageNumber, addAnnotation, canvasDimensions, scale, currentUser]);
 
   // Handle exporting PDF with annotations
   const handleExportWithAnnotations = useCallback(async () => {
@@ -558,12 +589,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
       {/* Signature modal */}
       <SignatureModal
-        isOpen={showSignatureModal}
-        onClose={() => {
-          setShowSignatureModal(false);
-          setPendingSignaturePosition(null);
-        }}
+        isOpen={!!pendingSignaturePosition}
+        onClose={() => setPendingSignaturePosition(null)}
         onSave={handleSaveSignature}
+        savedSignature={savedSignature}
       />
     </div>
   );

@@ -2,14 +2,18 @@ import React, { useRef } from 'react';
 import SignatureCanvas from 'react-signature-canvas';
 import { X, Trash2, Check } from 'lucide-react';
 
+import { UserSignature } from '@/services/firestore';
+
 interface SignatureModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (signatureDataUrl: string, width: number, height: number) => void;
+  onSave: (signatureDataUrl: string, width: number, height: number, saveToProfile: boolean) => void;
+  savedSignature?: UserSignature | null;
 }
 
-const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave }) => {
+const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave, savedSignature }) => {
   const signatureRef = useRef<SignatureCanvas>(null);
+  const [saveToProfile, setSaveToProfile] = React.useState(false);
 
   if (!isOpen) return null;
 
@@ -24,7 +28,14 @@ const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave
     const trimmedCanvas = signatureRef.current?.getTrimmedCanvas();
     if (trimmedCanvas) {
       const dataUrl = trimmedCanvas.toDataURL('image/png');
-      onSave(dataUrl, trimmedCanvas.width, trimmedCanvas.height);
+      onSave(dataUrl, trimmedCanvas.width, trimmedCanvas.height, saveToProfile);
+      onClose();
+    }
+  };
+
+  const handleUseSaved = () => {
+    if (savedSignature) {
+      onSave(savedSignature.dataUrl, savedSignature.width, savedSignature.height, false);
       onClose();
     }
   };
@@ -51,6 +62,27 @@ const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave
           </button>
         </div>
 
+        {savedSignature && (
+          <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-sm font-medium text-gray-700 mb-2">Saved Signature</p>
+            <div className="flex items-center justify-between">
+              <div className="h-10 border rounded bg-white px-2 flex items-center">
+                <img
+                  src={savedSignature.dataUrl}
+                  alt="Saved Signature"
+                  className="max-h-8 object-contain"
+                />
+              </div>
+              <button
+                onClick={handleUseSaved}
+                className="text-sm bg-blue-100 text-blue-700 px-3 py-1.5 rounded-md hover:bg-blue-200 transition-colors font-medium"
+              >
+                Use Saved
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="border-2 border-dashed border-gray-300 rounded-lg mb-4 bg-white">
           <SignatureCanvas
             ref={signatureRef}
@@ -61,6 +93,21 @@ const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave
             backgroundColor="rgba(0,0,0,0)"
           />
         </div>
+
+        {!savedSignature && (
+          <div className="flex items-center mb-4">
+            <input
+              type="checkbox"
+              id="saveToProfile"
+              checked={saveToProfile}
+              onChange={(e) => setSaveToProfile(e.target.checked)}
+              className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+            />
+            <label htmlFor="saveToProfile" className="ml-2 block text-sm text-gray-900">
+              Save to Profile
+            </label>
+          </div>
+        )}
 
         <div className="flex justify-between">
           <button
@@ -75,7 +122,7 @@ const SignatureModal: React.FC<SignatureModalProps> = ({ isOpen, onClose, onSave
             className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Check size={16} />
-            Add Signature
+            Add New
           </button>
         </div>
       </div>
