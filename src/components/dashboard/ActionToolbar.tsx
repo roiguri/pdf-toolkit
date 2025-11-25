@@ -4,7 +4,7 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppStore, AppMode } from '@/store/useAppStore';
-import { SplitSquareVertical, Combine, Image, PenLine } from 'lucide-react';
+import { SplitSquareVertical, Combine, Image, PenLine, Shrink } from 'lucide-react';
 import { toast } from 'sonner';
 
 const ActionToolbar = () => {
@@ -46,6 +46,13 @@ const ActionToolbar = () => {
       >
         <PenLine className="mr-2 h-4 w-4" />
         Edit
+      </Button>
+      <Button
+        variant={activeMode === 'compress' ? 'secondary' : 'ghost'}
+        onClick={() => handleModeChange('compress')}
+      >
+        <Shrink className="mr-2 h-4 w-4" />
+        Compress
       </Button>
     </div>
   );

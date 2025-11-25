@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { FileMetadata } from '@/services/firestore'; // Assuming FileMetadata is defined here
 
-export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit';
+export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
 
 export type AnnotationType = 'text' | 'signature';
 

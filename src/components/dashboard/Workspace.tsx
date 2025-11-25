@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { splitPdf, mergePdfs, downloadPdf } from '@/lib/pdf-utils';
 import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
+import CompressSidebar from './CompressSidebar';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
@@ -181,6 +182,8 @@ const Workspace = () => {
             )}
           </div>
         )}
+
+        {activeMode === 'compress' && <CompressSidebar />}
       </CardContent>
     </Card>
   );
