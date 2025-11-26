@@ -73,7 +73,6 @@ const CompressSidebar = () => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Compress PDF</h3>
       <p className="text-sm text-muted-foreground">
         Select a compression level. Higher compression reduces file size but may lower quality.
       </p>

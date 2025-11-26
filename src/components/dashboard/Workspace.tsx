@@ -183,7 +183,22 @@ const Workspace = () => {
           </div>
         )}
 
-        {activeMode === 'compress' && <CompressSidebar />}
+        {activeMode === 'compress' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex min-w-0">
+              <span className="flex-shrink-0">Compress PDF:&nbsp;</span>
+              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
+            </h3>
+            {selectedFile ? (
+              <>
+                <CompressSidebar />
+                <PDFViewer file={selectedFile} showConvertButton={false} />
+              </>
+            ) : (
+              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to compress.</p>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
