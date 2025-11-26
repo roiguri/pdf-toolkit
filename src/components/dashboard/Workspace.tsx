@@ -159,7 +159,7 @@ const Workspace = () => {
             </h3>
             {selectedFile ? (
               <p className="text-center text-muted-foreground">
-                To convert the current page to an image, please click the "Convert to Image" button within the PDF Viewer below.
+                To convert the current page to an image, please click the &quot;Convert to Image&quot; button within the PDF Viewer below.
               </p>
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to convert.</p>

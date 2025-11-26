@@ -85,10 +85,9 @@ const CompressSidebar = () => {
             <SelectValue placeholder="Select level" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="screen">Low (72 dpi)</SelectItem>
-            <SelectItem value="ebook">Medium (150 dpi)</SelectItem>
-            <SelectItem value="prepress">High (300 dpi)</SelectItem>
-            <SelectItem value="default">Default</SelectItem>
+            <SelectItem value="screen">High (Smallest size, 72 dpi)</SelectItem>
+            <SelectItem value="ebook">Medium (Average quality, 150 dpi)</SelectItem>
+            <SelectItem value="prepress">Low (Best quality, 300 dpi)</SelectItem>
           </SelectContent>
         </Select>
       </div>
