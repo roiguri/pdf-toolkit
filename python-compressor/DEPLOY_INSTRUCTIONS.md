@@ -9,31 +9,31 @@ Follow these steps to deploy the PDF compression service to Google Cloud Run.
 3.  **Enable APIs:** Enable the Cloud Run and Container Registry APIs for your project:
     ```bash
     gcloud services enable run.googleapis.com
-    gcloud services enable containerregistry.googleapis.com
+    gcloud services enable artifactregistry.googleapis.com
     ```
 
 ## Deployment Steps
 
 1.  **Authenticate Docker:** Configure Docker to use `gcloud` as a credential helper.
     ```bash
-    gcloud auth configure-docker
+    gcloud auth configure-docker us-central1-docker.pkg.dev
     ```
 
 2.  **Build the Docker Image:** Navigate to the `python-compressor` directory and build the Docker image. Replace `[PROJECT_ID]` with your Google Cloud project ID.
     ```bash
     cd python-compressor
-    docker build -t gcr.io/[PROJECT_ID]/pdf-compressor .
+    docker build -t us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor .
     ```
 
-3.  **Push the Image to GCR:** Push the image to the Google Container Registry.
+3.  **Push the Image to Artifact Registry:** Push the image to the Google Artifact Registry.
     ```bash
-    docker push gcr.io/[PROJECT_ID]/pdf-compressor
+    docker push us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor
     ```
 
 4.  **Deploy to Cloud Run:** Deploy the container image to Cloud Run. Replace `[PROJECT_ID]` with your project ID and `[REGION]` with your desired region (e.g., `us-central1`).
     ```bash
     gcloud run deploy pdf-compressor \
-      --image gcr.io/[PROJECT_ID]/pdf-compressor \
+      --image us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor \
       --platform managed \
       --region [REGION] \
       --allow-unauthenticated
@@ -42,5 +42,6 @@ Follow these steps to deploy the PDF compression service to Google Cloud Run.
 
 5.  **Get the Service URL:** After deployment, the command will output the URL of your service. It will look something like this:
     `https://pdf-compressor-xxxxxxxxxx-uc.a.run.app`
+    Your deployed service URL is: `https://pdf-compressor-837865788232.us-central1.run.app`
 
     You will need this URL for the frontend integration.
