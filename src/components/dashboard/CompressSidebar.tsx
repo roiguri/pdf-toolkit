@@ -1,7 +1,7 @@
 // src/components/dashboard/CompressSidebar.tsx
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from 'sonner';
@@ -17,9 +17,37 @@ import {
 const COMPRESSOR_API_URL = 'https://pdf-compressor-837865788232.us-central1.run.app/compress';
 
 const CompressSidebar = () => {
-  const { selectedFileId, files } = useAppStore();
+  const { 
+    selectedFileId, 
+    files, 
+    isCompressing, 
+    compressAbortController, 
+    setCompressionStatus 
+  } = useAppStore();
   const [compressionLevel, setCompressionLevel] = useState('ebook');
-  const [isCompressing, setIsCompressing] = useState(false);
+
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isCompressing) {
+        // Prompt the user to confirm leaving if compression is in progress
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      // Optional: abort on unmount if desired, but for now we strictly handle window unload
+    };
+  }, [isCompressing]);
+
+  const handleCancel = () => {
+    if (compressAbortController) {
+      compressAbortController.abort();
+      toast.info('Compression cancelled.');
+    }
+  };
 
   const handleCompress = async () => {
     if (!selectedFileId) {
@@ -33,12 +61,13 @@ const CompressSidebar = () => {
       return;
     }
 
-    setIsCompressing(true);
+    const controller = new AbortController();
+    setCompressionStatus(true, controller);
     toast.info('Compressing PDF...');
 
     try {
       // Fetch the file from the download URL
-      const response = await fetch(selectedFile.downloadURL);
+      const response = await fetch(selectedFile.downloadURL, { signal: controller.signal });
       const fileBlob = await response.blob();
 
       const formData = new FormData();
@@ -48,6 +77,7 @@ const CompressSidebar = () => {
       const compressResponse = await fetch(COMPRESSOR_API_URL, {
         method: 'POST',
         body: formData,
+        signal: controller.signal,
       });
 
       if (!compressResponse.ok) {
@@ -63,11 +93,16 @@ const CompressSidebar = () => {
       a.click();
       a.remove();
       toast.success('PDF compressed successfully!');
-    } catch (error) {
-      console.error('Compression error:', error);
-      toast.error('An error occurred during compression.');
+    } catch (error: any) {
+      if (error.name === 'AbortError') {
+        // Already handled by toast in handleCancel, or we can log it
+        console.log('Compression cancelled by user');
+      } else {
+        console.error('Compression error:', error);
+        toast.error('An error occurred during compression.');
+      }
     } finally {
-      setIsCompressing(false);
+      setCompressionStatus(false, null);
     }
   };
 
@@ -91,9 +126,24 @@ const CompressSidebar = () => {
         </Select>
       </div>
 
-      <Button onClick={handleCompress} disabled={!selectedFileId || isCompressing}>
-        {isCompressing ? 'Compressing...' : 'Compress PDF'}
-      </Button>
+      <div className="flex gap-2">
+        <Button 
+          onClick={handleCompress} 
+          disabled={!selectedFileId || isCompressing}
+          className="flex-1"
+        >
+          {isCompressing ? 'Compressing...' : 'Compress PDF'}
+        </Button>
+        
+        {isCompressing && (
+          <Button 
+            variant="destructive" 
+            onClick={handleCancel}
+          >
+            Cancel
+          </Button>
+        )}
+      </div>
     </div>
   );
 };
