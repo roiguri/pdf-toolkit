@@ -2,7 +2,7 @@
 import { create } from 'zustand';
 import { FileMetadata } from '@/services/firestore'; // Assuming FileMetadata is defined here
 
-export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit';
+export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
 
 export type AnnotationType = 'text' | 'signature';
 
@@ -29,6 +29,9 @@ interface AppState {
   annotations: Annotation[];
   activeEditTool: AnnotationType;
   selectedAnnotationId: string | null;
+  // Compression state
+  isCompressing: boolean;
+  compressAbortController: AbortController | null;
 
   setSelectedFileId: (id: string | null) => void;
   setActiveMode: (mode: AppMode) => void;
@@ -44,6 +47,8 @@ interface AppState {
   deleteAnnotation: (id: string) => void;
   setSelectedAnnotationId: (id: string | null) => void;
   clearAnnotations: () => void;
+  // Compression actions
+  setCompressionStatus: (isCompressing: boolean, controller?: AbortController | null) => void;
   reset: () => void;
 }
 
@@ -55,6 +60,8 @@ const initialState = {
   annotations: [] as Annotation[],
   activeEditTool: 'signature' as AnnotationType,
   selectedAnnotationId: null,
+  isCompressing: false,
+  compressAbortController: null,
 };
 
 export const useAppStore = create<AppState>((set) => ({
@@ -94,5 +101,8 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   setSelectedAnnotationId: (id) => set({ selectedAnnotationId: id }),
   clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
+  // Compression actions
+  setCompressionStatus: (isCompressing, controller = null) =>
+    set({ isCompressing, compressAbortController: controller }),
   reset: () => set(initialState),
 }));

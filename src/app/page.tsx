@@ -33,8 +33,9 @@ export default function LoginPage() {
     setIsSigningIn(true);
     try {
       await signIn(email, password);
-    } catch (error: any) {
-      toast.error(error.message || 'Email/Password sign-in failed.');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Email/Password sign-in failed.';
+      toast.error(errorMessage);
     } finally {
       setIsSigningIn(false);
     }

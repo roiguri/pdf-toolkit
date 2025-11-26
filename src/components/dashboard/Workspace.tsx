@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { splitPdf, mergePdfs, downloadPdf } from '@/lib/pdf-utils';
 import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
+import CompressSidebar from './CompressSidebar';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
@@ -158,7 +159,7 @@ const Workspace = () => {
             </h3>
             {selectedFile ? (
               <p className="text-center text-muted-foreground">
-                To convert the current page to an image, please click the "Convert to Image" button within the PDF Viewer below.
+                To convert the current page to an image, please click the &quot;Convert to Image&quot; button within the PDF Viewer below.
               </p>
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to convert.</p>
@@ -178,6 +179,23 @@ const Workspace = () => {
               <PDFViewer file={selectedFile} showConvertButton={false} />
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to edit.</p>
+            )}
+          </div>
+        )}
+
+        {activeMode === 'compress' && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold flex min-w-0">
+              <span className="flex-shrink-0">Compress PDF:&nbsp;</span>
+              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
+            </h3>
+            {selectedFile ? (
+              <>
+                <CompressSidebar />
+                <PDFViewer file={selectedFile} showConvertButton={false} />
+              </>
+            ) : (
+              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to compress.</p>
             )}
           </div>
         )}
