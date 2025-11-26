@@ -5,7 +5,6 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from 'sonner';
-import { getStorage, ref, getDownloadURL } from 'firebase/storage';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -15,10 +14,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 
-const COMPRESSOR_API_URL = 'https://pdf-compressor-xxxxxxxxxx-uc.a.run.app/compress'; // Replace with your actual Cloud Run URL
+const COMPRESSOR_API_URL = 'https://pdf-compressor-837865788232.us-central1.run.app/compress';
 
 const CompressSidebar = () => {
-  const { selectedFileId } = useAppStore();
+  const { selectedFileId, files } = useAppStore();
   const [compressionLevel, setCompressionLevel] = useState('ebook');
   const [isCompressing, setIsCompressing] = useState(false);
 
@@ -28,20 +27,22 @@ const CompressSidebar = () => {
       return;
     }
 
+    const selectedFile = files.find((f) => f.id === selectedFileId);
+    if (!selectedFile) {
+      toast.error('File not found.');
+      return;
+    }
+
     setIsCompressing(true);
     toast.info('Compressing PDF...');
 
     try {
-      const storage = getStorage();
-      const fileRef = ref(storage, `uploads/${selectedFileId}`); // Adjust the path as per your storage structure
-      const downloadURL = await getDownloadURL(fileRef);
-
       // Fetch the file from the download URL
-      const response = await fetch(downloadURL);
+      const response = await fetch(selectedFile.downloadURL);
       const fileBlob = await response.blob();
 
       const formData = new FormData();
-      formData.append('file', fileBlob, `${selectedFileId}.pdf`);
+      formData.append('file', fileBlob, selectedFile.name);
       formData.append('level', compressionLevel);
 
       const compressResponse = await fetch(COMPRESSOR_API_URL, {
@@ -57,7 +58,7 @@ const CompressSidebar = () => {
       const url = window.URL.createObjectURL(compressedBlob);
       const a = document.createElement('a');
       a.href = url;
-      a.download = `compressed-${selectedFileId}.pdf`;
+      a.download = `compressed-${selectedFile.name}`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -78,7 +79,7 @@ const CompressSidebar = () => {
       </p>
 
       <div>
-        <Label htmlFor="compression-level">Compression Level</Label>
+        <Label htmlFor="compression-level" className="mb-2">Compression Level</Label>
         <Select value={compressionLevel} onValueChange={setCompressionLevel}>
           <SelectTrigger id="compression-level">
             <SelectValue placeholder="Select level" />
