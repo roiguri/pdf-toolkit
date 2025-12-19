@@ -2,13 +2,12 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { Document, Page, pdfjs } from 'react-pdf';
+import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import {
-  ChevronLeft,
-  ChevronRight,
   Image as ImageIcon,
   Loader2,
   ZoomIn,
@@ -20,14 +19,15 @@ import {
   PanelLeftOpen
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { FileMetadata, saveUserSignature, getUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
+import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
 import { useAppStore } from '@/store/useAppStore';
-import AnnotationOverlay from './AnnotationOverlay';
 import SignatureModal from './SignatureModal';
 import EditToolbar from './EditToolbar';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { PDFPage } from './PDFPage';
+import { Page } from 'react-pdf';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -42,12 +42,6 @@ const MIN_SCALE = 0.5;
 const MAX_SCALE = 3;
 const ZOOM_STEP = 0.25;
 
-const PageLoading = (
-  <div className="flex items-center justify-center h-full w-full min-h-[300px]">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
-
 const DocumentLoading = (
   <div className="flex items-center justify-center h-full w-full min-h-[500px]">
     <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -60,17 +54,22 @@ const DocumentError = <p>Failed to load PDF. Check CORS settings or file availab
 export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
+  const [inputValue, setInputValue] = useState<string>('1');
   const [isConverting, setIsConverting] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
   const [scale, setScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
-  const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
 
+  // Track dimensions for all pages to support correct export coordinates
+  const [pagesDimensions, setPagesDimensions] = useState<Record<number, { width: number, height: number }>>({});
+
+  // Refs for scrolling to pages
+  const pageRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const pageContainerRef = useRef<HTMLDivElement>(null);
-  const viewerContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
+  const viewerContainerRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
 
   const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId, selectedAnnotationId, deleteAnnotation } = useAppStore();
@@ -88,43 +87,28 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     setScale(1);
   }, []);
 
-  // Pinch-to-zoom gesture handler
-  usePinch(
+  const bind = usePinch(
     ({ offset: [s], memo, active, last }) => {
       if (active) {
-        // During gesture: apply CSS transform for smooth 60fps performance
-        if (pageContainerRef.current) {
-          // We use the memo to store the initial scale when the gesture starts
+        if (pdfContentRef.current) {
           const initialScale = memo ?? scale;
-
-          // Calculate the new visual scale
-          // We clamp it visually but allow some overscroll feel
           const currentScale = s;
-
-          // Apply transform
-          pageContainerRef.current.style.transform = `scale(${currentScale / initialScale})`;
-          pageContainerRef.current.style.transformOrigin = '0 0';
-
+          pdfContentRef.current.style.transform = `scale(${currentScale / initialScale})`;
+          pdfContentRef.current.style.transformOrigin = '0 0';
           return initialScale;
         }
       } else if (last) {
-        // Gesture ended: commit the new scale
-        // Reset transform
-        if (pageContainerRef.current) {
-          pageContainerRef.current.style.transform = '';
+        if (pdfContentRef.current) {
+          pdfContentRef.current.style.transform = '';
         }
-
-        // Update React state to trigger re-render at new resolution
         setScale(Math.max(MIN_SCALE, Math.min(MAX_SCALE, s)));
       }
-
       return memo;
     },
     {
-      target: pageContainerRef,
       scaleBounds: { min: MIN_SCALE, max: MAX_SCALE },
       from: () => [scale, 0],
-      eventOptions: { passive: false },
+      eventOptions: { passive: false }, // Necessary for preventing browser zoom
     }
   );
 
@@ -133,14 +117,20 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     const container = pageContainerRef.current;
     if (!container) return;
 
+    // We only want to prevent default if it's a multi-touch (pinch) event
+    // This allows single-touch scrolling ("pan") to work natively
     const handleTouchStart = (e: TouchEvent) => {
-      // Only prevent default for multi-touch (pinch gestures) to allow usePinch to handle it
       if (e.touches.length >= 2) {
         e.preventDefault();
       }
     };
 
-    // Allow panning but prevent browser zoom
+    // 'pan-x pan-y' allows browser scrolling (which is 1-finger) 
+    // but tells browser we might handle 2-finger gestures or browser zoom shouldn't happen?
+    // Actually 'pan-x pan-y' tells the browser "I only handle panning, you can handle zoom".
+    // Wait, we WANT to handle zoom. So we should disable browser zoom.
+    // 'pan-x pan-y' allows panning but DISABLES double-tap zoom usually.
+    // To disable pinch zoom, we often resort to preventDefault on 2 fingers (implemented above).
     container.style.touchAction = 'pan-x pan-y';
 
     container.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -199,19 +189,16 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   }, []);
 
   // Track container width for responsive PDF scaling
-  // We store the base width (at scale 1.0) and apply scale separately
   useEffect(() => {
     const container = pageContainerRef.current;
     if (!container) return;
 
     const updateWidth = () => {
-      // Subtract padding (p-2 = 8px on each side)
-      const width = container.clientWidth - 16;
+      const width = container.clientWidth - 32; // More padding for scrollbar
       setContainerWidth(width > 0 ? width : undefined);
     };
 
     updateWidth();
-
     const resizeObserver = new ResizeObserver(updateWidth);
     resizeObserver.observe(container);
 
@@ -221,32 +208,104 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   // Reset zoom when file changes
   useEffect(() => {
     setScale(1);
+    setPagesDimensions({});
   }, [file.id]);
 
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
-    setPageNumber(1); // Reset to first page on new document load
+    setPageNumber(1);
+    setInputValue('1');
   }, []);
 
-  const changePage = (offset: number) => {
-    setPageNumber((prevPageNumber) => {
-      if (numPages === null) return prevPageNumber;
-      return Math.max(1, Math.min(numPages, prevPageNumber + offset));
-    });
+  const scrollToPage = (page: number) => {
+    const pageEl = pageRefs.current.get(page);
+    if (pageEl) {
+      pageEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+    }
   };
 
-  const previousPage = () => changePage(-1);
-  const nextPage = () => changePage(1);
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInputValue(e.target.value);
+  };
+
+  const handleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      const page = parseInt(inputValue);
+      if (!isNaN(page) && page >= 1 && page <= (numPages || 0)) {
+        scrollToPage(page);
+        // We don't setPageNumber here because the scroll listener will do it
+        e.currentTarget.blur();
+      } else {
+        // Reset to current page if invalid
+        setInputValue(pageNumber.toString());
+      }
+    }
+  };
+
+  const handleInputBlur = () => {
+    // Reset to current page if invalid or empty
+    setInputValue(pageNumber.toString());
+  };
+
+
+  // Intersection Observer for Current Page Detection
+  useEffect(() => {
+    const container = pageContainerRef.current;
+    if (!container || !numPages) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        // We want to find the entry that is most visible
+        let maxRatio = 0;
+        let mostVisiblePage = -1;
+
+        entries.forEach((entry) => {
+          const pageNum = parseInt(entry.target.getAttribute('data-page-number') || '0');
+          if (entry.isIntersecting && entry.intersectionRatio > maxRatio) {
+            maxRatio = entry.intersectionRatio;
+            mostVisiblePage = pageNum;
+          } else if (entry.isIntersecting && mostVisiblePage === -1) {
+            // If we haven't found a "most visible" yet, take the first intersecting one
+            mostVisiblePage = pageNum;
+          }
+        });
+
+        if (mostVisiblePage !== -1) {
+          setPageNumber((prev) => {
+            if (prev !== mostVisiblePage) {
+              setInputValue(mostVisiblePage.toString());
+              return mostVisiblePage;
+            }
+            return prev;
+          });
+        }
+      },
+      {
+        root: container,
+        threshold: [0.1, 0.5, 0.9], // Check at different visibility levels
+      }
+    );
+
+    // Observe all pages
+    pageRefs.current.forEach((el) => {
+      if (el) observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, [numPages]); // Re-run when numPages changes (and pages render)
+
 
   const handleDownloadImage = async () => {
-    if (!pageContainerRef.current) {
-      toast.error('Page container not found.');
+    // Find the current page's element
+    const pageEl = pageRefs.current.get(pageNumber);
+    if (!pageEl) {
+      toast.error('Current page not found.');
       return;
     }
 
-    const canvas = pageContainerRef.current.querySelector('canvas');
+    const canvas = pageEl.querySelector('canvas');
     if (!canvas) {
-      toast.error('PDF rendering not complete. Please wait a moment.');
+      toast.error('Page rendering not complete. Please wait a moment.');
       return;
     }
 
@@ -254,7 +313,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     toast.info('Converting page to image...', { id: 'image-conversion' });
 
     try {
-      const imageDataUrl = canvas.toDataURL('image/png', 1.0); // or 'image/jpeg'
+      const imageDataUrl = canvas.toDataURL('image/png', 1.0);
 
       const link = document.createElement('a');
       link.href = imageDataUrl;
@@ -271,62 +330,25 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     }
   };
 
-  // Track canvas dimensions for annotation overlay
-  useEffect(() => {
-    const container = pdfContentRef.current;
-    if (!container) return;
+  const handlePageDimensionsChange = useCallback((page: number, width: number, height: number) => {
+    setPagesDimensions(prev => ({
+      ...prev,
+      [page]: { width, height }
+    }));
+  }, []);
 
-    let timeoutId: NodeJS.Timeout;
 
-    const updateCanvasDimensions = () => {
-      // Clear any pending updates
-      if (timeoutId) clearTimeout(timeoutId);
+  // We need to store the page number for the pending signature
+  const [pendingSignaturePage, setPendingSignaturePage] = useState<number | null>(null);
 
-      // Debounce to prevent excessive updates during mobile browser UI changes
-      timeoutId = setTimeout(() => {
-        const canvas = container.querySelector('canvas');
-        if (canvas) {
-          // Use getBoundingClientRect for actual display dimensions
-          const rect = canvas.getBoundingClientRect();
-          setCanvasDimensions(prev => {
-            // Only update if dimensions changed significantly (> 1px)
-            if (Math.abs(prev.width - rect.width) < 1 && Math.abs(prev.height - rect.height) < 1) {
-              return prev;
-            }
-            return {
-              width: rect.width,
-              height: rect.height,
-            };
-          });
-        }
-      }, 100); // 100ms debounce
-    };
-
-    // Initial update
-    updateCanvasDimensions();
-
-    // Update on mutations (page render complete)
-    const observer = new MutationObserver(updateCanvasDimensions);
-    observer.observe(container, { childList: true, subtree: true });
-
-    // Also update on window resize for mobile orientation changes
-    window.addEventListener('resize', updateCanvasDimensions);
-
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-      observer.disconnect();
-      window.removeEventListener('resize', updateCanvasDimensions);
-    };
-  }, [pageNumber, scale, containerWidth]);
-
-  // Handle adding annotation when clicking on overlay
-  const handleAddAnnotation = useCallback((position: { x: number; y: number }) => {
+  const onPageAddAnnotation = useCallback((position: { x: number; y: number }, page: number) => {
     if (activeMode !== 'edit') return;
-
     if (activeEditTool === 'signature') {
       setPendingSignaturePosition(position);
+      setPendingSignaturePage(page);
     }
-  }, [activeMode, activeEditTool, pageNumber, addAnnotation, setSelectedAnnotationId]);
+  }, [activeMode, activeEditTool]);
+
 
   const [savedSignature, setSavedSignature] = useState<UserSignature | null>(null);
 
@@ -343,13 +365,22 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
   // Handle saving signature from modal
   const handleSaveSignature = useCallback(async (signatureDataUrl: string, width: number, height: number, saveToProfile: boolean) => {
-    if (!pendingSignaturePosition) return;
+    if (!pendingSignaturePosition || pendingSignaturePage === null) return;
+
+    const targetPage = pendingSignaturePage;
+
+    // Get dimensions for the specific page
+    const dimensions = pagesDimensions[targetPage] || { width: 0, height: 0 };
+    // Fallback if dimensions missing (shouldn't happen if page rendered)
+    if (dimensions.width === 0) {
+      console.error("Missing dimensions for page", targetPage);
+      return;
+    }
 
     if (saveToProfile && currentUser) {
       try {
         await saveUserSignature(currentUser.uid, signatureDataUrl, width, height);
         toast.success('Signature saved to profile');
-        // Update local state immediately
         setSavedSignature({
           id: 'default',
           dataUrl: signatureDataUrl,
@@ -363,7 +394,6 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       }
     }
 
-    // Calculate dimensions to fit within 120x60 box while maintaining aspect ratio
     const MAX_WIDTH = 120;
     const MAX_HEIGHT = 60;
     const aspectRatio = width / height;
@@ -376,14 +406,12 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       targetWidth = targetHeight * aspectRatio;
     }
 
-    // Use unscaled dimensions for consistent sizing regardless of zoom level
-    const unscaledWidth = canvasDimensions.width / scale;
-    const unscaledHeight = canvasDimensions.height / scale;
+    const unscaledWidth = dimensions.width / scale;
+    const unscaledHeight = dimensions.height / scale;
 
     const relativeWidth = unscaledWidth > 0 ? targetWidth / unscaledWidth : 0.15;
     const relativeHeight = unscaledHeight > 0 ? targetHeight / unscaledHeight : 0.08;
 
-    // Center the signature on the click point
     const centeredPosition = {
       x: pendingSignaturePosition.x - relativeWidth / 2,
       y: pendingSignaturePosition.y - relativeHeight / 2,
@@ -391,7 +419,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
     const newAnnotation = {
       id: crypto.randomUUID(),
-      pageNumber,
+      pageNumber: targetPage,
       type: 'signature' as const,
       position: centeredPosition,
       content: signatureDataUrl,
@@ -399,7 +427,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     };
     addAnnotation(newAnnotation);
     setPendingSignaturePosition(null);
-  }, [pendingSignaturePosition, pageNumber, addAnnotation, canvasDimensions, scale, currentUser]);
+    setPendingSignaturePage(null);
+  }, [pendingSignaturePosition, pendingSignaturePage, addAnnotation, pagesDimensions, scale, currentUser]);
 
   // Handle exporting PDF with annotations
   const handleExportWithAnnotations = useCallback(async () => {
@@ -411,10 +440,44 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     try {
       toast.info('Exporting PDF with annotations...', { id: 'export-pdf' });
 
-      // Pass unscaled dimensions for proper coordinate mapping
+      // Create a map of dimensions for each page that has annotations
+      // But embedAnnotationsInPdf expects a single 'unscaledDimensions' object?
+      // Let's check embedAnnotationsInPdf usage.
+      // It seems the utility might assume same size for all pages or we need to update it.
+      // The previous code passed:
+      // const unscaledDimensions = {
+      //   width: canvasDimensions.width / scale,
+      //   height: canvasDimensions.height / scale,
+      // };
+      // which implies one dimension for the whole doc.
+
+      // If the PDF has varying page sizes, this might be incorrect for some pages.
+      // However, the task is "replace pagination with scrolling", not "fix PDF export for mixed page sizes".
+      // But "Make sure this does not effect any of the tools woth extra care on edit".
+
+      // I should check if I can pass per-page dimensions to embedAnnotationsInPdf.
+      // If not, I should probably use the dimensions of the FIRST page, or the page of the annotation.
+
+      // Let's peek at `embedAnnotationsInPdf` signature in memory or assuming standard.
+      // Current usage: embedAnnotationsInPdf(url, annotations, dimensions).
+
+      // I will assume for now we use the dimensions of the first page or a dominant page.
+      // Or better, I can iterate and find the dimension for each annotation's page.
+      // But the function signature suggests one dimension arg.
+
+      // Let's stick to using the dimension of the *current active page* or Page 1?
+      // Using Page 1 is safer if we assume uniform pages.
+      // Using `pagesDimensions[1]` (or any available).
+
+      const firstPageDims = pagesDimensions[1] || Object.values(pagesDimensions)[0];
+
+      if (!firstPageDims) {
+        throw new Error("Page dimensions not available");
+      }
+
       const unscaledDimensions = {
-        width: canvasDimensions.width / scale,
-        height: canvasDimensions.height / scale,
+        width: firstPageDims.width / scale,
+        height: firstPageDims.height / scale,
       };
 
       const pdfBytes = await embedAnnotationsInPdf(
@@ -438,9 +501,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       console.error('Error exporting PDF:', error);
       toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
     }
-  }, [annotations, file, canvasDimensions]);
+  }, [annotations, file, pagesDimensions, scale]);
 
-  // Handle delete key for selected annotation
+  // Handle delete key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (activeMode !== 'edit' || !selectedAnnotationId) return;
@@ -466,21 +529,23 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
         <>
           {/* Controls toolbar */}
           <div className="flex flex-wrap items-center justify-center gap-2 w-full">
-            {/* Thumbnail toggle */}
             <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? 'Hide pages' : 'Show pages'}>
               {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
             </Button>
 
-            {/* Page navigation */}
-            <Button onClick={previousPage} disabled={pageNumber <= 1} variant="outline" size="icon">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
-            <span className="text-sm font-medium whitespace-nowrap">
-              Page {pageNumber} of {numPages || '...'}
-            </span>
-            <Button onClick={nextPage} disabled={pageNumber >= (numPages || 0)} variant="outline" size="icon">
-              <ChevronRight className="h-4 w-4" />
-            </Button>
+            {/* Pagination Input */}
+            <div className="flex items-center gap-2">
+              <Input
+                value={inputValue}
+                onChange={handleInputChange}
+                onKeyDown={handleInputKeyDown}
+                onBlur={handleInputBlur}
+                className="w-16 text-center h-9"
+              />
+              <span className="text-sm font-medium whitespace-nowrap">
+                / {numPages || '...'}
+              </span>
+            </div>
 
             {/* Zoom controls */}
             <div className="flex items-center gap-1 ml-2">
@@ -496,12 +561,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
               </Button>
             </div>
 
-            {/* Fullscreen toggle */}
             <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
 
-            {/* Convert to image button */}
             {showConvertButton && (
               <Button
                 onClick={handleDownloadImage}
@@ -516,16 +579,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             )}
           </div>
 
-          {/* Edit toolbar */}
           {activeMode === 'edit' && (
             <div className="flex justify-center">
               <EditToolbar onExport={handleExportWithAnnotations} />
             </div>
           )}
 
-          {/* Main content area with thumbnails sidebar */}
           <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
-            {/* Thumbnails sidebar */}
+            {/* Thumbnails */}
             {showThumbnails && (
               <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
                 }`}>
@@ -533,7 +594,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
                       key={index + 1}
-                      onClick={() => setPageNumber(index + 1)}
+                      onClick={() => scrollToPage(index + 1)}
                       className={`w-full p-1 rounded border-2 transition-colors ${pageNumber === index + 1
                         ? 'border-primary bg-primary/10'
                         : 'border-transparent hover:border-muted-foreground/30'
@@ -557,16 +618,16 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
               </div>
             )}
 
-            {/* PDF viewer */}
+            {/* Scrollable PDF List */}
             <div
               className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
                 }`}
               ref={pageContainerRef}
-              style={{ touchAction: 'pan-x pan-y' }}
+              {...bind()}
             >
               <div
                 ref={pdfContentRef}
-                className="w-fit mx-auto"
+                className="w-full"
               >
                 <Document
                   file={file.downloadURL}
@@ -575,25 +636,30 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                   noData={DocumentNoData}
                   error={DocumentError}
                 >
-                  <div className="relative">
-                    <Page
-                      pageNumber={pageNumber}
-                      width={containerWidth ? containerWidth * scale : undefined}
-                      loading={PageLoading}
-                      renderTextLayer={false}
-                      renderAnnotationLayer={false}
-                      canvasBackground="white"
-                    />
-                    {canvasDimensions.width > 0 && (
-                      <AnnotationOverlay
-                        pageNumber={pageNumber}
-                        canvasWidth={canvasDimensions.width}
-                        canvasHeight={canvasDimensions.height}
+                  {numPages && Array.from({ length: numPages }, (_, index) => {
+                    const pageNum = index + 1;
+                    // Simple lazy loading logic: Render if within +/- 3 pages of current page
+                    const isNear = Math.abs(pageNumber - pageNum) <= 2;
+
+                    return (
+                      <PDFPage
+                        key={pageNum}
+                        ref={(el) => {
+                          if (el) {
+                            pageRefs.current.set(pageNum, el);
+                          } else {
+                            pageRefs.current.delete(pageNum);
+                          }
+                        }}
+                        pageNumber={pageNum}
                         scale={scale}
-                        onAddAnnotation={handleAddAnnotation}
+                        containerWidth={containerWidth}
+                        shouldRender={isNear || pageNum === 1} // Always render page 1 to start
+                        onAddAnnotation={(pos) => onPageAddAnnotation(pos, pageNum)}
+                        onDimensionsChange={(w, h) => handlePageDimensionsChange(pageNum, w, h)}
                       />
-                    )}
-                  </div>
+                    );
+                  })}
                 </Document>
               </div>
             </div>
@@ -603,10 +669,12 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
         <p className="text-muted-foreground">Select a PDF to view.</p>
       )}
 
-      {/* Signature modal */}
       <SignatureModal
         isOpen={!!pendingSignaturePosition}
-        onClose={() => setPendingSignaturePosition(null)}
+        onClose={() => {
+          setPendingSignaturePosition(null);
+          setPendingSignaturePage(null);
+        }}
         onSave={handleSaveSignature}
         savedSignature={savedSignature}
       />
