@@ -248,6 +248,7 @@ const FileExplorer = () => {
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
   const [itemToRename, setItemToRename] = useState<{ id: string; name: string; type: 'file' | 'folder' } | null>(null);
   const [fileToMove, setFileToMove] = useState<FileMetadata | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<FileMetadata | null>(null);
 
   useEffect(() => {
     if (currentUser?.uid) {
@@ -552,6 +553,20 @@ const FileExplorer = () => {
                       </span>
                     )}
 
+                    {file.type !== 'folder' && (
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-destructive hover:bg-destructive/10 md:hidden"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setItemToDelete(file);
+                        }}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted" onClick={(e) => e.stopPropagation()}>
@@ -568,58 +583,15 @@ const FileExplorer = () => {
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
-
-                        {file.type === 'folder' ? (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete folder?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Permanently delete folder "{file.name}" and all {files.filter(f => f.folderId === file.id).length} items inside?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={(e) => {
-                                  e.stopPropagation(); // prevent closing dropdown (already closed), just good practice
-                                  handleRecursiveDelete(file);
-                                }} className="bg-red-600 hover:bg-red-700">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        ) : (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50">
-                                <Trash2 className="mr-2 h-4 w-4" /> Delete
-                              </DropdownMenuItem>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Delete file?</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Permanently delete "{file.name}"?
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteFile(file);
-                                }} className="bg-red-600 hover:bg-red-700">
-                                  Delete
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setItemToDelete(file);
+                          }}
+                          className="text-red-600 focus:text-red-600 focus:bg-red-50"
+                        >
+                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -673,6 +645,40 @@ const FileExplorer = () => {
           }}
         />
       )}
+
+      <AlertDialog open={!!itemToDelete} onOpenChange={(open) => !open && setItemToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {itemToDelete?.type === 'folder' ? 'Delete folder?' : 'Delete file?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {itemToDelete?.type === 'folder'
+                ? `Permanently delete folder "${itemToDelete.name}" and all ${files.filter(f => f.folderId === itemToDelete.id).length} items inside?`
+                : `Permanently delete "${itemToDelete?.name}"?`
+              }
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 hover:bg-red-700"
+              onClick={() => {
+                if (itemToDelete) {
+                  if (itemToDelete.type === 'folder') {
+                    handleRecursiveDelete(itemToDelete);
+                  } else {
+                    handleDeleteFile(itemToDelete);
+                  }
+                  setItemToDelete(null);
+                }
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 };
