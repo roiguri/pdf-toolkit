@@ -4,7 +4,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { useAuth } from '@/components/auth/AuthProvider';
-import { addFileMetadata, FileMetadata, getUserFilesMetadata, updateFileMetadata, deleteFileMetadata } from '@/services/firestore';
+import { addFileMetadata, FileMetadata, getUserFilesMetadata, updateFileMetadata, deleteFileMetadata, createFolder, renameFileMetadata, moveFile } from '@/services/firestore';
 import { uploadPdfFile, deletePdfFile } from '@/services/storage';
 import { useAppStore } from '@/store/useAppStore';
 import { getPageCount } from '@/lib/pdf-utils';
@@ -12,8 +12,28 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Trash2, FileText, Loader2 } from 'lucide-react';
+import { Trash2, FileText, Loader2, Folder, MoreVertical, Edit, Move, FolderPlus, ArrowLeft } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'; // For Move Dialog
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,6 +45,185 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+
+// Helper Dialogs
+const CreateFolderDialog = ({
+  open,
+  onOpenChange,
+  onCreate,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onCreate: (name: string) => void;
+}) => {
+  const [name, setName] = useState('');
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Create New Folder</DialogTitle>
+          <DialogDescription>Enter a name for the new folder.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="name" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="col-span-3"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && name.trim()) {
+                  onCreate(name);
+                  setName('');
+                }
+              }}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (name.trim()) {
+                onCreate(name);
+                setName('');
+              }
+            }}
+            disabled={!name.trim()}
+          >
+            Create
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const RenameDialog = ({
+  open,
+  onOpenChange,
+  onRename,
+  initialName,
+  type,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onRename: (newName: string) => void;
+  initialName: string;
+  type: 'file' | 'folder';
+}) => {
+  const [name, setName] = useState(initialName);
+
+  useEffect(() => {
+    if (open) setName(initialName);
+  }, [open, initialName]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Rename {type === 'folder' ? 'Folder' : 'File'}</DialogTitle>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="rename-input" className="text-right">
+              Name
+            </Label>
+            <Input
+              id="rename-input"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="col-span-3"
+              autoFocus
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && name.trim()) {
+                  onRename(name);
+                }
+              }}
+            />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => {
+              if (name.trim()) {
+                onRename(name);
+              }
+            }}
+            disabled={!name.trim() || name === initialName}
+          >
+            Save
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+const MoveDialog = ({
+  open,
+  onOpenChange,
+  onMove,
+  folders,
+  currentFolderId,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onMove: (targetFolderId: string | null) => void;
+  folders: FileMetadata[];
+  currentFolderId: string | null;
+}) => {
+  const [targetId, setTargetId] = useState<string | null>(currentFolderId || 'root');
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Move File</DialogTitle>
+          <DialogDescription>Select a destination folder.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4 max-h-[300px] overflow-y-auto">
+          <RadioGroup value={targetId ?? 'root'} onValueChange={(v) => setTargetId(v === 'root' ? null : v)}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="root" id="r-root" disabled={currentFolderId === null} />
+              <Label htmlFor="r-root" className="flex items-center gap-2">
+                <Folder className="h-4 w-4 text-muted-foreground" /> <span>My PDFs (Root)</span>
+              </Label>
+            </div>
+            {folders.map(f => (
+              <div key={f.id} className="flex items-center space-x-2 ml-4">
+                <RadioGroupItem value={f.id} id={`r-${f.id}`} disabled={currentFolderId === f.id} />
+                <Label htmlFor={`r-${f.id}`} className="flex items-center gap-2">
+                  <Folder className="h-4 w-4 text-blue-500" /> <span>{f.name}</span>
+                </Label>
+              </div>
+            ))}
+          </RadioGroup>
+        </div>
+        <DialogFooter>
+          <Button onClick={() => onOpenChange(false)} variant="outline">
+            Cancel
+          </Button>
+          <Button
+            onClick={() => onMove(targetId === 'root' ? null : targetId)}
+            disabled={targetId === (currentFolderId || 'root')}
+          >
+            Move
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
 
 const FileExplorer = () => {
   const { currentUser } = useAuth();
@@ -39,9 +238,16 @@ const FileExplorer = () => {
     removeFileFromMergeSelection,
     clearMergeSelection,
     reset,
+    currentFolderId,
+    setCurrentFolderId
   } = useAppStore();
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: number }>({}); // {fileName: progress}
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+
+  // Dialog states
+  const [isCreatingFolder, setIsCreatingFolder] = useState(false);
+  const [itemToRename, setItemToRename] = useState<{ id: string; name: string; type: 'file' | 'folder' } | null>(null);
+  const [fileToMove, setFileToMove] = useState<FileMetadata | null>(null);
 
   useEffect(() => {
     if (currentUser?.uid) {
@@ -94,6 +300,7 @@ const FileExplorer = () => {
             storageRef,
             downloadURL,
             pageCount,
+            folderId: currentFolderId, // Add to current folder
           });
 
           // Update toast to success
@@ -115,7 +322,7 @@ const FileExplorer = () => {
         }
       }
     },
-    [currentUser, selectedFileId, files.length, setSelectedFileId, setFiles]
+    [currentUser, selectedFileId, files.length, setSelectedFileId, setFiles, currentFolderId]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
@@ -124,22 +331,52 @@ const FileExplorer = () => {
     if (!currentUser?.uid) return;
 
     try {
-      // 1. Delete from Firebase Storage
-      await deletePdfFile(file.storageRef);
-      // 2. Delete from Firestore
-      await deleteFileMetadata(currentUser.uid, file.id);
+      if (file.type === 'folder') {
+        // Recursive delete logic would go here if we were doing it clientside
+        // But for now, we'll just check if empty
+        const filesInFolder = files.filter(f => f.folderId === file.id);
+        if (filesInFolder.length > 0) {
+          // This case is handled by the specific delete dialog logic below
+        }
+        await deleteFileMetadata(currentUser.uid, file.id);
+      } else {
+        // 1. Delete from Firebase Storage (only if it has one)
+        if (file.storageRef) {
+          await deletePdfFile(file.storageRef);
+        }
+        // 2. Delete from Firestore
+        await deleteFileMetadata(currentUser.uid, file.id);
+      }
 
       toast.success(`"${file.name}" deleted successfully.`);
 
-      // If the deleted file was selected, clear selection
       if (selectedFileId === file.id) {
         setSelectedFileId(null);
       }
-      // If the deleted file was in merge selection, remove it
       removeFileFromMergeSelection(file.id);
     } catch (error) {
-      console.error('Failed to delete file:', error);
+      console.error('Failed to delete item:', error);
       toast.error(`Failed to delete "${file.name}".`);
+    }
+  };
+
+  const handleRecursiveDelete = async (folder: FileMetadata) => {
+    if (!currentUser?.uid) return;
+    try {
+      const filesInFolder = files.filter(f => f.folderId === folder.id);
+
+      // Delete all files inside
+      await Promise.all(filesInFolder.map(async (file) => {
+        if (file.storageRef) await deletePdfFile(file.storageRef);
+        await deleteFileMetadata(currentUser.uid!, file.id);
+      }));
+
+      // Delete the folder itself
+      await deleteFileMetadata(currentUser.uid, folder.id);
+      toast.success(`Folder "${folder.name}" and contents deleted.`);
+    } catch (error) {
+      console.error("Recursive delete error", error);
+      toast.error("Failed to delete folder and contents.");
     }
   };
 
@@ -148,15 +385,13 @@ const FileExplorer = () => {
 
     setIsDeletingAll(true);
     try {
-      // Delete all files from Storage and Firestore
       await Promise.all(
         files.map(async (file) => {
-          await deletePdfFile(file.storageRef);
-          await deleteFileMetadata(currentUser.uid, file.id);
+          if (file.storageRef) await deletePdfFile(file.storageRef);
+          await deleteFileMetadata(currentUser.uid!, file.id);
         })
       );
 
-      // Reset app state
       reset();
       toast.success('All files deleted successfully');
     } catch (error) {
@@ -175,39 +410,69 @@ const FileExplorer = () => {
     }
   };
 
+  // Filtering and Sorting
+  const filteredFiles = files.filter(f => {
+    if (currentFolderId) {
+      return f.folderId === currentFolderId;
+    }
+    return !f.folderId; // Root items
+  }).sort((a, b) => {
+    // Folders first
+    if (a.type === 'folder' && b.type !== 'folder') return -1;
+    if (a.type !== 'folder' && b.type === 'folder') return 1;
+    return a.name.localeCompare(b.name);
+  });
+
+  const currentFolder = currentFolderId ? files.find(f => f.id === currentFolderId) : null;
+  const folders = files.filter(f => f.type === 'folder');
+
   return (
     <Card className="flex h-full flex-col overflow-hidden">
       <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between space-y-0 pb-2">
-        <CardTitle>My PDFs</CardTitle>
-        {files.length > 0 && (
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-destructive hover:bg-destructive/10"
-                disabled={isDeletingAll}
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete all files?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  This action cannot be undone. This will permanently delete all {files.length} PDF
-                  file{files.length !== 1 ? 's' : ''} from your account.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDeleteAllFiles}>
-                  Delete All
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        )}
+        <div className="flex items-center gap-2">
+          {currentFolderId && (
+            <Button variant="ghost" size="icon" onClick={() => setCurrentFolderId(null)} title="Back to Root">
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+          )}
+          <CardTitle>{currentFolder ? currentFolder.name : 'My PDFs'}</CardTitle>
+        </div>
+        <div className="flex items-center gap-1">
+          {!currentFolderId && ( // Only allow folder creation at root (single level)
+            <Button variant="outline" size="sm" onClick={() => setIsCreatingFolder(true)}>
+              <FolderPlus className="h-4 w-4 mr-1" />
+              New Folder
+            </Button>
+          )}
+          {files.length > 0 && !currentFolderId && ( // Delete All only at root
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-destructive hover:bg-destructive/10"
+                  disabled={isDeletingAll}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete all files?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This action cannot be undone. This will permanently delete all {files.length} items from your account.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteAllFiles}>
+                    Delete All
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="flex flex-grow flex-col space-y-4 overflow-hidden">
         {/* Drop Zone */}
@@ -238,11 +503,13 @@ const FileExplorer = () => {
 
         {/* File List */}
         <div className="flex-grow overflow-y-auto rounded-md border p-2 max-h-[30vh] sm:max-h-none">
-          {files.length === 0 ? (
-            <p className="p-4 text-center text-muted-foreground">No PDFs uploaded yet.</p>
+          {filteredFiles.length === 0 ? (
+            <p className="p-4 text-center text-muted-foreground">
+              {currentFolderId ? 'Folder is empty.' : 'No PDFs uploaded yet.'}
+            </p>
           ) : (
             <div className="space-y-2">
-              {files.map((file) => (
+              {filteredFiles.map((file) => (
                 <div
                   key={file.id}
                   className={cn(
@@ -252,6 +519,10 @@ const FileExplorer = () => {
                     activeMode !== 'merge' && 'cursor-pointer'
                   )}
                   onClick={() => {
+                    if (file.type === 'folder') {
+                      setCurrentFolderId(file.id);
+                      return;
+                    }
                     if (activeMode === 'merge') {
                       toggleMergeSelection(file.id);
                     } else {
@@ -260,7 +531,7 @@ const FileExplorer = () => {
                   }}
                 >
                   <div className="flex items-center gap-2 min-w-0 flex-1">
-                    {activeMode === 'merge' ? (
+                    {activeMode === 'merge' && file.type !== 'folder' ? (
                       <Checkbox
                         checked={mergeSelection.includes(file.id)}
                         onCheckedChange={() => toggleMergeSelection(file.id)}
@@ -268,40 +539,89 @@ const FileExplorer = () => {
                         className="h-5 w-5 flex-shrink-0"
                       />
                     ) : (
-                      <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
+                      file.type === 'folder' ? <Folder className="h-5 w-5 flex-shrink-0 text-blue-500 fill-blue-100" /> : <FileText className="h-5 w-5 flex-shrink-0 text-muted-foreground" />
                     )}
-                    <span className="truncate text-sm">
+                    <span className="truncate text-sm font-medium">
                       {file.name}
                     </span>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {file.pageCount && (
-                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {file.type !== 'folder' && file.pageCount && (
+                      <span className="text-xs text-muted-foreground whitespace-nowrap mr-2">
                         {file.pageCount}p
                       </span>
                     )}
-                    <AlertDialog>
-                      <AlertDialogTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:bg-destructive/10">
-                          <Trash2 className="h-4 w-4" />
+
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:bg-muted" onClick={(e) => e.stopPropagation()}>
+                          <MoreVertical className="h-4 w-4" />
                         </Button>
-                      </AlertDialogTrigger>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                          <AlertDialogDescription className="break-all">
-                            This action cannot be undone. This will permanently delete your PDF
-                            file &quot;{file.name}&quot; from our servers.
-                          </AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>Cancel</AlertDialogCancel>
-                          <AlertDialogAction onClick={() => handleDeleteFile(file)}>
-                            Continue
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setItemToRename({ id: file.id, name: file.name, type: file.type as 'file' | 'folder' }); }}>
+                          <Edit className="mr-2 h-4 w-4" /> Rename
+                        </DropdownMenuItem>
+                        {file.type !== 'folder' && (
+                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setFileToMove(file); }}>
+                            <Move className="mr-2 h-4 w-4" /> Move
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuSeparator />
+
+                        {file.type === 'folder' ? (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete folder?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Permanently delete folder "{file.name}" and all {files.filter(f => f.folderId === file.id).length} items inside?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={(e) => {
+                                  e.stopPropagation(); // prevent closing dropdown (already closed), just good practice
+                                  handleRecursiveDelete(file);
+                                }} className="bg-red-600 hover:bg-red-700">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        ) : (
+                          <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600 focus:text-red-600 focus:bg-red-50">
+                                <Trash2 className="mr-2 h-4 w-4" /> Delete
+                              </DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent onClick={(e) => e.stopPropagation()}>
+                              <AlertDialogHeader>
+                                <AlertDialogTitle>Delete file?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                  Permanently delete "{file.name}"?
+                                </AlertDialogDescription>
+                              </AlertDialogHeader>
+                              <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleDeleteFile(file);
+                                }} className="bg-red-600 hover:bg-red-700">
+                                  Delete
+                                </AlertDialogAction>
+                              </AlertDialogFooter>
+                            </AlertDialogContent>
+                          </AlertDialog>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               ))}
@@ -309,6 +629,50 @@ const FileExplorer = () => {
           )}
         </div>
       </CardContent>
+
+      <CreateFolderDialog
+        open={isCreatingFolder}
+        onOpenChange={setIsCreatingFolder}
+        onCreate={async (name) => {
+          if (currentUser) {
+            await createFolder(currentUser.uid, name, currentFolderId);
+            toast.success('Folder created');
+            setIsCreatingFolder(false);
+          }
+        }}
+      />
+
+      {itemToRename && (
+        <RenameDialog
+          open={!!itemToRename}
+          onOpenChange={(open) => !open && setItemToRename(null)}
+          initialName={itemToRename.name}
+          type={itemToRename.type}
+          onRename={async (newName) => {
+            if (currentUser && itemToRename) {
+              await renameFileMetadata(currentUser.uid, itemToRename.id, newName);
+              toast.success('Renamed successfully');
+              setItemToRename(null);
+            }
+          }}
+        />
+      )}
+
+      {fileToMove && (
+        <MoveDialog
+          open={!!fileToMove}
+          onOpenChange={(open) => !open && setFileToMove(null)}
+          folders={folders}
+          currentFolderId={fileToMove.folderId || null}
+          onMove={async (targetId) => {
+            if (currentUser && fileToMove) {
+              await moveFile(currentUser.uid, fileToMove.id, targetId);
+              toast.success('File moved');
+              setFileToMove(null);
+            }
+          }}
+        />
+      )}
     </Card>
   );
 };

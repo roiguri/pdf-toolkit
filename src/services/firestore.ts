@@ -18,15 +18,16 @@ import {
 import { User as FirebaseAuthUser } from 'firebase/auth';
 
 export interface FileMetadata {
-  id: string; // Stored as document ID, but also good to have in data
+  id: string; // Stored as document ID
   name: string;
-  size: number;
-  type: string; // "application/pdf"
-  storageRef: string; // e.g., uploads/{uid}/{fileId}_originalName.pdf
-  downloadURL: string;
+  size?: number; // Optional for folders
+  type: string; // "application/pdf" or "folder"
+  storageRef?: string; // Optional for folders
+  downloadURL?: string; // Optional for folders
   uploadedAt: Date;
   lastModified: Date;
-  pageCount?: number; // Optional, calculated on upload
+  pageCount?: number; // Optional
+  folderId?: string | null; // ID of the parent folder, or null for root
 }
 
 const USERS_COLLECTION = 'users';
@@ -53,6 +54,20 @@ export const addFileMetadata = async (
   return { id: newDoc.id, ...(newDoc.data() as Omit<FileMetadata, 'id'>) };
 };
 
+// Create a new folder
+export const createFolder = async (
+  userId: string,
+  name: string,
+  parentFolderId: string | null = null
+): Promise<FileMetadata> => {
+  return addFileMetadata(userId, {
+    name,
+    type: 'folder',
+    folderId: parentFolderId,
+    // Folders don't have size, storageRef, or downloadURL
+  });
+};
+
 // Get single file metadata
 export const getFileMetadata = async (
   userId: string,
@@ -66,7 +81,7 @@ export const getFileMetadata = async (
   return null;
 };
 
-// Listen for a user's files in real-time
+// Listen for a user's files and folders in real-time
 export const getUserFilesMetadata = (
   userId: string,
   callback: (files: FileMetadata[]) => void
@@ -78,6 +93,7 @@ export const getUserFilesMetadata = (
     FILES_SUBCOLLECTION
   );
   // Order by uploadedAt for consistent display
+  // We fetch ALL items (files and folders) and filter/sort on client side
   const q = query(userFilesCollectionRef, orderBy('uploadedAt', 'asc'));
 
   const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -88,10 +104,10 @@ export const getUserFilesMetadata = (
     callback(files);
   });
 
-  return unsubscribe; // Return the unsubscribe function
+  return unsubscribe;
 };
 
-// Update file metadata (e.g., pageCount)
+// Update file metadata (e.g., pageCount, rename, move)
 export const updateFileMetadata = async (
   userId: string,
   fileId: string,
@@ -100,6 +116,32 @@ export const updateFileMetadata = async (
   const fileDocRef = doc(db, USERS_COLLECTION, userId, FILES_SUBCOLLECTION, fileId);
   await updateDoc(fileDocRef, {
     ...data,
+    lastModified: serverTimestamp(),
+  });
+};
+
+// Rename a file or folder
+export const renameFileMetadata = async (
+  userId: string,
+  fileId: string,
+  newName: string
+) => {
+  const fileDocRef = doc(db, USERS_COLLECTION, userId, FILES_SUBCOLLECTION, fileId);
+  await updateDoc(fileDocRef, {
+    name: newName,
+    lastModified: serverTimestamp(),
+  });
+};
+
+// Move a file or folder to a new parent folder
+export const moveFile = async (
+  userId: string,
+  fileId: string,
+  newFolderId: string | null
+) => {
+  const fileDocRef = doc(db, USERS_COLLECTION, userId, FILES_SUBCOLLECTION, fileId);
+  await updateDoc(fileDocRef, {
+    folderId: newFolderId,
     lastModified: serverTimestamp(),
   });
 };

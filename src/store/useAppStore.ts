@@ -33,6 +33,10 @@ interface AppState {
   isCompressing: boolean;
   compressAbortController: AbortController | null;
 
+  // Folder state
+  currentFolderId: string | null;
+  setCurrentFolderId: (id: string | null) => void;
+
   setSelectedFileId: (id: string | null) => void;
   setActiveMode: (mode: AppMode) => void;
   setFiles: (files: FileMetadata[]) => void;
@@ -56,6 +60,7 @@ const initialState = {
   selectedFileId: null,
   activeMode: 'view' as AppMode,
   files: [],
+  currentFolderId: null, // Default to root
   mergeSelection: [],
   annotations: [] as Annotation[],
   activeEditTool: 'signature' as AnnotationType,
@@ -67,6 +72,7 @@ const initialState = {
 export const useAppStore = create<AppState>((set) => ({
   ...initialState,
 
+  setCurrentFolderId: (id) => set({ currentFolderId: id }),
   setSelectedFileId: (id) => set({ selectedFileId: id }),
   setActiveMode: (mode) => set({ activeMode: mode }),
   setFiles: (files) => set({ files }),
