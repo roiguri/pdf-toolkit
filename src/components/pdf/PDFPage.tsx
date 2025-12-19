@@ -12,6 +12,7 @@ interface PDFPageProps {
   shouldRender: boolean;
   onAddAnnotation: (position: { x: number; y: number }) => void;
   onDimensionsChange?: (width: number, height: number) => void;
+  searchQuery?: string;
 }
 
 const PageLoading = (
@@ -27,9 +28,104 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   shouldRender,
   onAddAnnotation,
   onDimensionsChange,
+  searchQuery,
 }, ref) => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const pageContentRef = useRef<HTMLDivElement>(null);
+  const textLayerRendered = useRef(false);
+
+  // Function to highlight text
+  const highlightText = useCallback(() => {
+    if (!pageContentRef.current || !searchQuery) return;
+
+    // Simple text highlighting within DOM nodes
+    // This is a basic implementation and might need refinement for complex cases
+    // Note: react-pdf creates a separate text layer div
+    const textLayer = pageContentRef.current.querySelector('.react-pdf__Page__textContent');
+    if (!textLayer) return;
+
+    // Reset previous highlights (if we could, but rebuilding text layer handles it usually)
+    // Actually, react-pdf rebuilds text layer on zoom, but not on query change.
+    // So we might need to "reset" if we modify the DOM.
+    // But since we modify innerHTML, we might break React's reconciliation if we are not careful?
+    // react-pdf manages the text layer content.
+    // If we change searchQuery, we want to re-apply highlighting.
+    // If we modify the DOM, we should ideally revert it first?
+    // Or just rely on re-rendering?
+    // Since we can't easily force re-render of text layer without hack,
+    // we can iterate through spans and update them.
+
+    const spans = textLayer.querySelectorAll('span');
+    spans.forEach((span) => {
+       // Save original text if not saved
+       if (!span.getAttribute('data-original-text')) {
+         span.setAttribute('data-original-text', span.textContent || '');
+       }
+
+       const originalText = span.getAttribute('data-original-text') || '';
+
+       if (!searchQuery.trim()) {
+         span.textContent = originalText; // Restore safely
+         return;
+       }
+
+       const lowerText = originalText.toLowerCase();
+       const lowerQuery = searchQuery.toLowerCase();
+
+       if (lowerText.includes(lowerQuery)) {
+         // Escape HTML in original text to prevent XSS
+         const escapeHtml = (unsafe: string) => {
+           return unsafe
+             .replace(/&/g, "&amp;")
+             .replace(/</g, "&lt;")
+             .replace(/>/g, "&gt;")
+             .replace(/"/g, "&quot;")
+             .replace(/'/g, "&#039;");
+         };
+
+         // Highlight
+         // We use regex to replace case-insensitive but keep case
+         // We need to match against the original text, but inserting HTML tags into escaped text is tricky if we don't escape first.
+         // But if we escape first, the query might not match if it contains special chars.
+         // Let's assume query is plain text.
+
+         // Better approach:
+         // 1. Find matches in original string.
+         // 2. Build the new HTML string by escaping non-match parts and wrapping match parts.
+
+         const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
+
+         const parts = originalText.split(regex);
+         const newHtml = parts.map(part => {
+             if (part.toLowerCase() === lowerQuery) {
+                 return `<mark class="bg-yellow-300 text-transparent bg-opacity-50">${escapeHtml(part)}</mark>`;
+             } else {
+                 return escapeHtml(part);
+             }
+         }).join('');
+
+         span.innerHTML = newHtml;
+       } else {
+         // Also escape when restoring!
+         // Wait, originalText came from span.textContent which is unescaped.
+         // Assigning to innerHTML requires escaping.
+         // Or just use textContent to restore.
+         span.textContent = originalText;
+       }
+    });
+  }, [searchQuery]);
+
+  // Trigger highlight when searchQuery changes or text layer renders
+  useEffect(() => {
+    if (textLayerRendered.current) {
+      highlightText();
+    }
+  }, [highlightText]);
+
+  const onRenderTextLayerSuccess = () => {
+    textLayerRendered.current = true;
+    highlightText();
+  };
 
   // Track canvas dimensions for annotation overlay
   useEffect(() => {
@@ -88,8 +184,9 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             pageNumber={pageNumber}
             width={containerWidth ? containerWidth * scale : undefined}
             loading={PageLoading}
-            renderTextLayer={false}
+            renderTextLayer={true}
             renderAnnotationLayer={false}
+            onRenderTextLayerSuccess={onRenderTextLayerSuccess}
             canvasBackground="white"
             className="shadow-md"
           />
