@@ -37,6 +37,11 @@ const Workspace = () => {
       return;
     }
 
+    if (!selectedFile.downloadURL) {
+      toast.error('File URL is missing: cannot result split.');
+      return;
+    }
+
     setIsProcessing(true);
     toast.info('Splitting PDF...', { id: 'pdf-processing' });
     try {
@@ -68,6 +73,9 @@ const Workspace = () => {
     try {
       const arrayBuffers = await Promise.all(
         filesToMerge.map(async (file) => {
+          if (!file.downloadURL) {
+            throw new Error(`Missing download URL for file: ${file.name}`);
+          }
           const response = await fetch(file.downloadURL);
           return response.arrayBuffer();
         })

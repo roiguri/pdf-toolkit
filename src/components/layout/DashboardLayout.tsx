@@ -117,7 +117,9 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       if (currentUser?.uid && files.length > 0) {
         await Promise.all(
           files.map(async (file) => {
-            await deletePdfFile(file.storageRef);
+            if (file.storageRef) {
+              await deletePdfFile(file.storageRef);
+            }
             await deleteFileMetadata(currentUser.uid, file.id);
           })
         );

@@ -480,6 +480,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
         height: firstPageDims.height / scale,
       };
 
+      if (!file.downloadURL) {
+        throw new Error('File URL is missing');
+      }
+
       const pdfBytes = await embedAnnotationsInPdf(
         file.downloadURL,
         annotations,
