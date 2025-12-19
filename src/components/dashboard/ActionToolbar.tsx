@@ -3,9 +3,24 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+} from '@/components/ui/dropdown-menu';
 import { useAppStore, AppMode } from '@/store/useAppStore';
-import { SplitSquareVertical, Combine, Image, PenLine, Shrink } from 'lucide-react';
-import { toast } from 'sonner';
+import {
+  SplitSquareVertical,
+  Combine,
+  Image,
+  PenLine,
+  Shrink,
+  ChevronDown,
+  Eye,
+} from 'lucide-react';
 
 const ActionToolbar = () => {
   const { setActiveMode, activeMode, mergeSelection, clearMergeSelection } = useAppStore();
@@ -17,44 +32,70 @@ const ActionToolbar = () => {
     }
   };
 
+  const getActiveModeLabel = () => {
+    switch (activeMode) {
+      case 'view':
+        return 'View';
+      case 'split':
+        return 'Split';
+      case 'merge':
+        return `Merge (${mergeSelection.length})`;
+      case 'convert':
+        return 'Convert';
+      case 'edit':
+        return 'Edit';
+      case 'compress':
+        return 'Compress';
+      default:
+        return 'Actions';
+    }
+  };
+
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-md border p-2">
-      <Button
-        variant={activeMode === 'split' ? 'secondary' : 'ghost'}
-        onClick={() => handleModeChange('split')}
-      >
-        <SplitSquareVertical className="mr-2 h-4 w-4" />
-        Split
-      </Button>
-      <Button
-        variant={activeMode === 'merge' ? 'secondary' : 'ghost'}
-        onClick={() => handleModeChange('merge')}
-      >
-        <Combine className="mr-2 h-4 w-4" />
-        Merge ({mergeSelection.length})
-      </Button>
-      <Button
-        variant={activeMode === 'convert' ? 'secondary' : 'ghost'}
-        onClick={() => handleModeChange('convert')}
-      >
-        <Image className="mr-2 h-4 w-4" />
-        Convert
-      </Button>
-      <Button
-        variant={activeMode === 'edit' ? 'secondary' : 'ghost'}
-        onClick={() => handleModeChange('edit')}
-      >
-        <PenLine className="mr-2 h-4 w-4" />
-        Edit
-      </Button>
-      <Button
-        variant={activeMode === 'compress' ? 'secondary' : 'ghost'}
-        onClick={() => handleModeChange('compress')}
-      >
-        <Shrink className="mr-2 h-4 w-4" />
-        Compress
-      </Button>
-    </div>
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="outline" className="w-[200px] justify-between">
+          <span className="flex items-center gap-2">
+            {activeMode === 'view' && <Eye className="h-4 w-4" />}
+            {activeMode === 'split' && <SplitSquareVertical className="h-4 w-4" />}
+            {activeMode === 'merge' && <Combine className="h-4 w-4" />}
+            {activeMode === 'convert' && <Image className="h-4 w-4" />}
+            {activeMode === 'edit' && <PenLine className="h-4 w-4" />}
+            {activeMode === 'compress' && <Shrink className="h-4 w-4" />}
+            {getActiveModeLabel()}
+          </span>
+          <ChevronDown className="h-4 w-4 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-[200px]" align="start">
+        <DropdownMenuRadioGroup value={activeMode} onValueChange={(value) => handleModeChange(value as AppMode)}>
+          <DropdownMenuRadioItem value="view">
+            <Eye className="mr-2 h-4 w-4" />
+            View
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="split">
+            <SplitSquareVertical className="mr-2 h-4 w-4" />
+            Split
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="merge">
+            <Combine className="mr-2 h-4 w-4" />
+            Merge {mergeSelection.length > 0 && `(${mergeSelection.length})`}
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="convert">
+            <Image className="mr-2 h-4 w-4" />
+            Convert
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="edit">
+            <PenLine className="mr-2 h-4 w-4" />
+            Edit
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="compress">
+            <Shrink className="mr-2 h-4 w-4" />
+            Compress
+          </DropdownMenuRadioItem>
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 

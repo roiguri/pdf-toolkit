@@ -86,11 +86,11 @@ const Workspace = () => {
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
-      <CardHeader className="flex-shrink-0">
+      <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>Workspace</CardTitle>
+        <ActionToolbar />
       </CardHeader>
       <CardContent className="flex flex-grow flex-col space-y-4 overflow-y-auto">
-        <ActionToolbar />
 
         {activeMode === 'view' && (
           selectedFile ? (
