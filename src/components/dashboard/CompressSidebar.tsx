@@ -26,12 +26,12 @@ interface CompressedResult {
 }
 
 const CompressSidebar = () => {
-  const { 
-    selectedFileId, 
-    files, 
-    isCompressing, 
-    compressAbortController, 
-    setCompressionStatus 
+  const {
+    selectedFileId,
+    files,
+    isCompressing,
+    compressAbortController,
+    setCompressionStatus
   } = useAppStore();
   const [compressionLevel, setCompressionLevel] = useState('ebook');
   const [compressedResult, setCompressedResult] = useState<CompressedResult | null>(null);
@@ -88,6 +88,10 @@ const CompressSidebar = () => {
     toast.info('Compressing PDF...');
 
     try {
+      if (!selectedFile.downloadURL) {
+        throw new Error('File download URL is missing');
+      }
+
       // Fetch the file from the download URL
       const response = await fetch(selectedFile.downloadURL, { signal: controller.signal });
       const fileBlob = await response.blob();
@@ -108,12 +112,12 @@ const CompressSidebar = () => {
 
       const compressedBlob = await compressResponse.blob();
       const url = window.URL.createObjectURL(compressedBlob);
-      
+
       setCompressedResult({
         url,
         size: compressedBlob.size,
         name: `compressed-${selectedFile.name}`,
-        originalSize: selectedFile.size,
+        originalSize: selectedFile.size || 0,
       });
 
       toast.success('PDF compressed successfully!');
@@ -153,7 +157,7 @@ const CompressSidebar = () => {
       <div className="space-y-6">
         <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
           <h3 className="font-medium">Compression Complete!</h3>
-          
+
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
               <p className="text-muted-foreground">Original</p>
@@ -198,7 +202,7 @@ const CompressSidebar = () => {
           <span className="text-muted-foreground">Selected: </span>
           <span className="font-medium">{selectedFile.name}</span>
           <span className="text-muted-foreground block text-xs mt-1">
-            Size: {formatBytes(selectedFile.size)}
+            Size: {formatBytes(selectedFile.size || 0)}
           </span>
         </div>
       )}
@@ -218,17 +222,17 @@ const CompressSidebar = () => {
       </div>
 
       <div className="flex gap-2">
-        <Button 
-          onClick={handleCompress} 
+        <Button
+          onClick={handleCompress}
           disabled={!selectedFileId || isCompressing}
           className="flex-1"
         >
           {isCompressing ? 'Compressing...' : 'Compress PDF'}
         </Button>
-        
+
         {isCompressing && (
-          <Button 
-            variant="destructive" 
+          <Button
+            variant="destructive"
             onClick={handleCancel}
           >
             Cancel
