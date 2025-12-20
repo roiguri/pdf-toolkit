@@ -69,7 +69,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [searchResults, setSearchResults] = useState<{ page: number }[]>([]);
+  const [searchResults, setSearchResults] = useState<{ page: number; matchIndexOnPage: number }[]>([]);
   const [currentResultIndex, setCurrentResultIndex] = useState(-1);
   const [isSearching, setIsSearching] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -232,10 +232,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     pdfDocumentRef.current = pdf;
   }, []);
 
-  const scrollToPage = (page: number) => {
+  const scrollToPage = (page: number, options?: ScrollIntoViewOptions) => {
     const pageEl = pageRefs.current.get(page);
     if (pageEl) {
-      pageEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+      pageEl.scrollIntoView({ behavior: 'auto', block: 'start', ...options });
     }
   };
 
@@ -352,19 +352,31 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     }));
   }, []);
 
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   // Search functionality
-  const performSearch = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (!searchQuery.trim() || !pdfDocumentRef.current) return;
+  const performSearch = useCallback(async () => {
+    if (!debouncedSearchQuery.trim() || !pdfDocumentRef.current) {
+      setSearchResults([]);
+      return;
+    }
 
     setIsSearching(true);
     setSearchResults([]);
     setCurrentResultIndex(-1);
 
     try {
-      const results: { page: number }[] = [];
+      const results: { page: number; matchIndexOnPage: number }[] = [];
       const numPages = pdfDocumentRef.current.numPages;
-      const query = searchQuery.toLowerCase();
+      const query = debouncedSearchQuery.toLowerCase();
 
       for (let i = 1; i <= numPages; i++) {
         const page = await pdfDocumentRef.current.getPage(i);
@@ -374,9 +386,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
         const matchesCount = text.toLowerCase().split(query).length - 1;
         if (matchesCount > 0) {
-           for(let k=0; k<matchesCount; k++) {
-             results.push({ page: i });
-           }
+          for (let k = 0; k < matchesCount; k++) {
+            results.push({ page: i, matchIndexOnPage: k });
+          }
         }
       }
 
@@ -384,8 +396,6 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       if (results.length > 0) {
         setCurrentResultIndex(0);
         scrollToPage(results[0].page);
-      } else {
-        toast.info('No matches found');
       }
 
     } catch (error) {
@@ -394,14 +404,20 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     } finally {
       setIsSearching(false);
     }
-  };
+  }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    performSearch();
+  }, [performSearch]);
 
   const nextResult = () => {
     if (searchResults.length === 0) return;
     const newIndex = (currentResultIndex + 1) % searchResults.length;
     setCurrentResultIndex(newIndex);
     const result = searchResults[newIndex];
-    scrollToPage(result.page);
+    if (result.page !== pageNumber) {
+      scrollToPage(result.page, { block: 'nearest' });
+    }
   };
 
   const prevResult = () => {
@@ -409,7 +425,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     const newIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
     setCurrentResultIndex(newIndex);
     const result = searchResults[newIndex];
-    scrollToPage(result.page);
+    if (result.page !== pageNumber) {
+      scrollToPage(result.page, { block: 'nearest' });
+    }
   };
 
   const clearSearch = () => {
@@ -630,10 +648,20 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
             {isSearchOpen && (
               <div className="absolute top-full left-0 mt-2 z-20 bg-background border p-2 rounded-md shadow-lg flex items-center gap-2 min-w-[300px]">
-                <form onSubmit={performSearch} className="flex items-center gap-2 flex-1">
+                <form onSubmit={(e) => e.preventDefault()} className="flex items-center gap-2 flex-1">
                   <Input
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                          prevResult();
+                        } else {
+                          nextResult();
+                        }
+                      }
+                    }}
                     placeholder="Search text..."
                     className="h-8"
                     autoFocus
@@ -783,7 +811,12 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                         shouldRender={isNear || pageNum === 1} // Always render page 1 to start
                         onAddAnnotation={(pos) => onPageAddAnnotation(pos, pageNum)}
                         onDimensionsChange={(w, h) => handlePageDimensionsChange(pageNum, w, h)}
-                        searchQuery={searchQuery}
+                        searchQuery={debouncedSearchQuery}
+                        focusedMatchIndex={
+                          searchResults[currentResultIndex]?.page === pageNum
+                            ? searchResults[currentResultIndex].matchIndexOnPage
+                            : null
+                        }
                       />
                     );
                   })}

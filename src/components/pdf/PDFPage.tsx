@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Page } from 'react-pdf';
 import { Loader2 } from 'lucide-react';
 import AnnotationOverlay from './AnnotationOverlay';
@@ -13,6 +13,7 @@ interface PDFPageProps {
   onAddAnnotation: (position: { x: number; y: number }) => void;
   onDimensionsChange?: (width: number, height: number) => void;
   searchQuery?: string;
+  focusedMatchIndex?: number | null;
 }
 
 const PageLoading = (
@@ -20,6 +21,12 @@ const PageLoading = (
     <Loader2 className="h-8 w-8 animate-spin text-primary" />
   </div>
 );
+
+interface HighlightRect {
+  id: string;
+  rects: { top: number; left: number; width: number; height: number }[];
+  isFocused: boolean;
+}
 
 export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   pageNumber,
@@ -29,103 +36,147 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   onAddAnnotation,
   onDimensionsChange,
   searchQuery,
+  focusedMatchIndex,
 }, ref) => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
+  const [highlights, setHighlights] = useState<HighlightRect[]>([]);
   const pageContentRef = useRef<HTMLDivElement>(null);
   const textLayerRendered = useRef(false);
 
-  // Function to highlight text
-  const highlightText = useCallback(() => {
-    if (!pageContentRef.current || !searchQuery) return;
+  // Function to calculate highlights without modifying DOM
+  const calculateHighlights = useCallback(() => {
+    if (!pageContentRef.current || !searchQuery || !searchQuery.trim()) {
+      setHighlights([]);
+      return;
+    }
 
-    // Simple text highlighting within DOM nodes
-    // This is a basic implementation and might need refinement for complex cases
-    // Note: react-pdf creates a separate text layer div
     const textLayer = pageContentRef.current.querySelector('.react-pdf__Page__textContent');
     if (!textLayer) return;
 
-    // Reset previous highlights (if we could, but rebuilding text layer handles it usually)
-    // Actually, react-pdf rebuilds text layer on zoom, but not on query change.
-    // So we might need to "reset" if we modify the DOM.
-    // But since we modify innerHTML, we might break React's reconciliation if we are not careful?
-    // react-pdf manages the text layer content.
-    // If we change searchQuery, we want to re-apply highlighting.
-    // If we modify the DOM, we should ideally revert it first?
-    // Or just rely on re-rendering?
-    // Since we can't easily force re-render of text layer without hack,
-    // we can iterate through spans and update them.
+    const containerRect = pageContentRef.current.getBoundingClientRect();
+    const spans = Array.from(textLayer.querySelectorAll('span'));
 
-    const spans = textLayer.querySelectorAll('span');
-    spans.forEach((span) => {
-       // Save original text if not saved
-       if (!span.getAttribute('data-original-text')) {
-         span.setAttribute('data-original-text', span.textContent || '');
-       }
+    // 1. Build global text string and map indices to text nodes
+    let fullText = '';
+    const nodeMap: { node: Node; start: number; end: number }[] = [];
 
-       const originalText = span.getAttribute('data-original-text') || '';
+    spans.forEach((span, i) => {
+      const textNode = span.firstChild;
+      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        const text = textNode.textContent || '';
+        const start = fullText.length;
+        fullText += text;
+        const end = fullText.length;
 
-       if (!searchQuery.trim()) {
-         span.textContent = originalText; // Restore safely
-         return;
-       }
+        nodeMap.push({ node: textNode, start, end });
 
-       const lowerText = originalText.toLowerCase();
-       const lowerQuery = searchQuery.toLowerCase();
-
-       if (lowerText.includes(lowerQuery)) {
-         // Escape HTML in original text to prevent XSS
-         const escapeHtml = (unsafe: string) => {
-           return unsafe
-             .replace(/&/g, "&amp;")
-             .replace(/</g, "&lt;")
-             .replace(/>/g, "&gt;")
-             .replace(/"/g, "&quot;")
-             .replace(/'/g, "&#039;");
-         };
-
-         // Highlight
-         // We use regex to replace case-insensitive but keep case
-         // We need to match against the original text, but inserting HTML tags into escaped text is tricky if we don't escape first.
-         // But if we escape first, the query might not match if it contains special chars.
-         // Let's assume query is plain text.
-
-         // Better approach:
-         // 1. Find matches in original string.
-         // 2. Build the new HTML string by escaping non-match parts and wrapping match parts.
-
-         const regex = new RegExp(`(${searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-
-         const parts = originalText.split(regex);
-         const newHtml = parts.map(part => {
-             if (part.toLowerCase() === lowerQuery) {
-                 return `<mark class="bg-yellow-300 text-transparent bg-opacity-50">${escapeHtml(part)}</mark>`;
-             } else {
-                 return escapeHtml(part);
-             }
-         }).join('');
-
-         span.innerHTML = newHtml;
-       } else {
-         // Also escape when restoring!
-         // Wait, originalText came from span.textContent which is unescaped.
-         // Assigning to innerHTML requires escaping.
-         // Or just use textContent to restore.
-         span.textContent = originalText;
-       }
+        if (i < spans.length - 1) {
+          fullText += ' ';
+        }
+      }
     });
-  }, [searchQuery]);
 
-  // Trigger highlight when searchQuery changes or text layer renders
+    const newHighlights: HighlightRect[] = [];
+    const lowerText = fullText.toLowerCase();
+    const lowerQuery = searchQuery.toLowerCase();
+    let matchCount = 0;
+
+    let startIndex = 0;
+    let index = lowerText.indexOf(lowerQuery, startIndex);
+
+    while (index !== -1) {
+      const matchStart = index;
+      const matchEnd = matchStart + lowerQuery.length;
+
+      const startNodeData = nodeMap.find(n => matchStart >= n.start && matchStart < n.end);
+
+      if (startNodeData) {
+        let endNodeData = nodeMap.find(n => matchEnd > n.start && matchEnd <= n.end);
+
+        if (!endNodeData) {
+          const lastNode = nodeMap[nodeMap.length - 1];
+          if (lastNode && matchEnd > lastNode.end) endNodeData = lastNode;
+          else endNodeData = nodeMap.find(n => matchEnd <= n.end && matchEnd > n.start);
+        }
+        if (!endNodeData && nodeMap.length > 0) endNodeData = nodeMap.find(n => n.end >= matchEnd);
+
+        if (startNodeData && endNodeData) {
+          try {
+            const range = document.createRange();
+            let startOffset = matchStart - startNodeData.start;
+            let endOffset = matchEnd - endNodeData.start;  // Global offset
+
+            if (startOffset < 0) startOffset = 0;
+            if (startOffset > (startNodeData.node.textContent?.length || 0)) startOffset = startNodeData.node.textContent?.length || 0;
+            if (endOffset < 0) endOffset = 0;
+            if (endOffset > (endNodeData.node.textContent?.length || 0)) endOffset = endNodeData.node.textContent?.length || 0;
+
+            range.setStart(startNodeData.node, startOffset);
+            range.setEnd(endNodeData.node, endOffset);
+
+            const clientRects = Array.from(range.getClientRects());
+            if (clientRects.length > 0) {
+              const relativeRects = clientRects.map(rect => ({
+                top: rect.top - containerRect.top,
+                left: rect.left - containerRect.left,
+                width: rect.width,
+                height: rect.height
+              }));
+              newHighlights.push({
+                id: `highlight-${matchCount}`,
+                rects: relativeRects,
+                isFocused: matchCount === focusedMatchIndex
+              });
+              matchCount++;
+            }
+          } catch (e) {
+            console.warn('Range error', e);
+          }
+        }
+      }
+      startIndex = index + lowerQuery.length;
+      index = lowerText.indexOf(lowerQuery, startIndex);
+    }
+    setHighlights(newHighlights);
+
+  }, [searchQuery, focusedMatchIndex]);
+
+  // Trigger calculation when text layer is ready or query changes
   useEffect(() => {
     if (textLayerRendered.current) {
-      highlightText();
+      // Debounce slightly to allow layout to settle?
+      // Range API is sync and fast.
+      calculateHighlights();
     }
-  }, [highlightText]);
+  }, [calculateHighlights]);
 
-  const onRenderTextLayerSuccess = () => {
+  // Handle scrolling via Callback Ref (Simpler, more robust than useEffect)
+  const scrollToRef = useCallback((node: HTMLDivElement | null) => {
+    if (node) {
+      // Use requestAnimationFrame to ensure layout is settled after page scroll
+      requestAnimationFrame(() => {
+        node.scrollIntoView({ behavior: 'auto', block: 'center', inline: 'center' });
+      });
+    }
+  }, []);
+
+  const onRenderTextLayerSuccess = useCallback(() => {
     textLayerRendered.current = true;
-    highlightText();
-  };
+    calculateHighlightsRef.current?.();
+  }, []);
+
+  // Use a ref to access latest calculateHighlights without changing callback dependency
+  const calculateHighlightsRef = useRef(calculateHighlights);
+  useEffect(() => {
+    calculateHighlightsRef.current = calculateHighlights;
+  }, [calculateHighlights]);
+
+  // Trigger calculation when text layer is ready or query changes
+  useEffect(() => {
+    if (textLayerRendered.current) {
+      calculateHighlights();
+    }
+  }, [calculateHighlights]); // calculateHighlights changes on query/index change, so this works.
 
   // Track canvas dimensions for annotation overlay
   useEffect(() => {
@@ -133,6 +184,8 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     if (!container) return;
 
     let timeoutId: NodeJS.Timeout;
+
+    let lastDimensions = { width: 0, height: 0 };
 
     const updateCanvasDimensions = () => {
       if (timeoutId) clearTimeout(timeoutId);
@@ -151,8 +204,12 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             return { width: newWidth, height: newHeight };
           });
 
+          // Only notify parent if dimensions have significantly changed to prevent infinite loops
           if (onDimensionsChange) {
-            onDimensionsChange(newWidth, newHeight);
+            if (Math.abs(lastDimensions.width - newWidth) >= 1 || Math.abs(lastDimensions.height - newHeight) >= 1) {
+              lastDimensions = { width: newWidth, height: newHeight };
+              onDimensionsChange(newWidth, newHeight);
+            }
           }
         }
       }, 100);
@@ -179,28 +236,57 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
       style={{ minHeight: '300px' }} // Minimum height to prevent total collapse
     >
       <div ref={pageContentRef} className="relative">
-        {shouldRender ? (
-          <Page
-            pageNumber={pageNumber}
-            width={containerWidth ? containerWidth * scale : undefined}
-            loading={PageLoading}
-            renderTextLayer={true}
-            renderAnnotationLayer={false}
-            onRenderTextLayerSuccess={onRenderTextLayerSuccess}
-            canvasBackground="white"
-            className="shadow-md"
-          />
-        ) : (
-          <div
-            className="bg-white shadow-md flex items-center justify-center text-muted-foreground"
-            style={{
-              width: containerWidth ? containerWidth * scale : '100%',
-              height: canvasDimensions.height || '1000px' // Try to maintain height if known, else guess
-            }}
-          >
-             <span className="text-sm">Page {pageNumber}</span>
-          </div>
-        )}
+        {useMemo(() => (
+          shouldRender ? (
+            <Page
+              pageNumber={pageNumber}
+              width={containerWidth ? containerWidth * scale : undefined}
+              loading={PageLoading}
+              renderTextLayer={true}
+              renderAnnotationLayer={false}
+              onRenderTextLayerSuccess={onRenderTextLayerSuccess}
+              canvasBackground="white"
+              className="shadow-md"
+            />
+          ) : (
+            <div
+              className="bg-white shadow-md flex items-center justify-center text-muted-foreground"
+              style={{
+                width: containerWidth ? containerWidth * scale : '100%',
+                height: canvasDimensions.height || '1000px'
+              }}
+            >
+              <span className="text-sm">Page {pageNumber}</span>
+            </div>
+          )
+        ), [shouldRender, pageNumber, containerWidth, scale, onRenderTextLayerSuccess, canvasDimensions.height])}
+
+        {/* Highlight Overlay Layer */}
+        <div className="absolute inset-0 pointer-events-none z-10">
+          {highlights.map((highlight) => (
+            <div
+              key={highlight.id}
+              id={`highlight-overlay-${highlight.id}`}
+              className="absolute top-0 left-0 w-full h-full"
+            >
+              {/* We render individual rects for this match */}
+              {highlight.rects.map((rect, i) => (
+                <div
+                  key={i}
+                  // Attach ref to the FIRST rect of the focused highlight to scroll to it
+                  ref={highlight.isFocused && i === 0 ? scrollToRef : null}
+                  className={`absolute ${highlight.isFocused ? 'bg-orange-500/50' : 'bg-yellow-300/50'}`}
+                  style={{
+                    top: rect.top,
+                    left: rect.left,
+                    width: rect.width,
+                    height: rect.height,
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
 
         {shouldRender && canvasDimensions.width > 0 && (
           <AnnotationOverlay
