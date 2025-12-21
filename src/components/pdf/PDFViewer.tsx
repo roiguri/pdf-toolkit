@@ -16,7 +16,11 @@ import {
   Maximize,
   Minimize,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Search,
+  ChevronUp,
+  ChevronDown,
+  X
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
@@ -61,6 +65,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
+
+  // Search state
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<{ page: number; matchIndexOnPage: number }[]>([]);
+  const [currentResultIndex, setCurrentResultIndex] = useState(-1);
+  const [isSearching, setIsSearching] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pdfDocumentRef = useRef<any>(null);
 
   // Track dimensions for all pages to support correct export coordinates
   const [pagesDimensions, setPagesDimensions] = useState<Record<number, { width: number, height: number }>>({});
@@ -211,16 +224,18 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     setPagesDimensions({});
   }, [file.id]);
 
-  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
-    setNumPages(numPages);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const onDocumentLoadSuccess = useCallback((pdf: any) => {
+    setNumPages(pdf.numPages);
     setPageNumber(1);
     setInputValue('1');
+    pdfDocumentRef.current = pdf;
   }, []);
 
-  const scrollToPage = (page: number) => {
+  const scrollToPage = (page: number, options?: ScrollIntoViewOptions) => {
     const pageEl = pageRefs.current.get(page);
     if (pageEl) {
-      pageEl.scrollIntoView({ behavior: 'auto', block: 'start' });
+      pageEl.scrollIntoView({ behavior: 'auto', block: 'start', ...options });
     }
   };
 
@@ -336,6 +351,91 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       [page]: { width, height }
     }));
   }, []);
+
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Search functionality
+  const performSearch = useCallback(async () => {
+    if (!debouncedSearchQuery.trim() || !pdfDocumentRef.current) {
+      setSearchResults([]);
+      return;
+    }
+
+    setIsSearching(true);
+    setSearchResults([]);
+    setCurrentResultIndex(-1);
+
+    try {
+      const results: { page: number; matchIndexOnPage: number }[] = [];
+      const numPages = pdfDocumentRef.current.numPages;
+      const query = debouncedSearchQuery.toLowerCase();
+
+      for (let i = 1; i <= numPages; i++) {
+        const page = await pdfDocumentRef.current.getPage(i);
+        const textContent = await page.getTextContent();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const text = textContent.items.map((item: any) => item.str).join(' ');
+
+        const matchesCount = text.toLowerCase().split(query).length - 1;
+        if (matchesCount > 0) {
+          for (let k = 0; k < matchesCount; k++) {
+            results.push({ page: i, matchIndexOnPage: k });
+          }
+        }
+      }
+
+      setSearchResults(results);
+      if (results.length > 0) {
+        setCurrentResultIndex(0);
+        scrollToPage(results[0].page);
+      }
+
+    } catch (error) {
+      console.error('Search error:', error);
+      toast.error('Failed to perform search');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [debouncedSearchQuery]);
+
+  useEffect(() => {
+    performSearch();
+  }, [performSearch]);
+
+  const nextResult = () => {
+    if (searchResults.length === 0) return;
+    const newIndex = (currentResultIndex + 1) % searchResults.length;
+    setCurrentResultIndex(newIndex);
+    const result = searchResults[newIndex];
+    if (result.page !== pageNumber) {
+      scrollToPage(result.page, { block: 'nearest' });
+    }
+  };
+
+  const prevResult = () => {
+    if (searchResults.length === 0) return;
+    const newIndex = (currentResultIndex - 1 + searchResults.length) % searchResults.length;
+    setCurrentResultIndex(newIndex);
+    const result = searchResults[newIndex];
+    if (result.page !== pageNumber) {
+      scrollToPage(result.page, { block: 'nearest' });
+    }
+  };
+
+  const clearSearch = () => {
+    setSearchQuery('');
+    setSearchResults([]);
+    setCurrentResultIndex(-1);
+    setIsSearchOpen(false);
+  };
 
 
   // We need to store the page number for the pending signature
@@ -532,10 +632,57 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       {file ? (
         <>
           {/* Controls toolbar */}
-          <div className="flex flex-wrap items-center justify-center gap-2 w-full">
+          <div className="flex flex-wrap items-center justify-center gap-2 w-full relative">
             <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? 'Hide pages' : 'Show pages'}>
               {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
             </Button>
+
+            <Button
+              onClick={() => setIsSearchOpen(!isSearchOpen)}
+              variant={isSearchOpen ? "secondary" : "outline"}
+              size="icon"
+              title="Search"
+            >
+              <Search className="h-4 w-4" />
+            </Button>
+
+            {isSearchOpen && (
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 bg-background border p-2 rounded-md shadow-lg flex items-center gap-2 min-w-[300px]">
+                <form onSubmit={(e) => e.preventDefault()} className="flex items-center gap-2 flex-1">
+                  <Input
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        if (e.shiftKey) {
+                          prevResult();
+                        } else {
+                          nextResult();
+                        }
+                      }
+                    }}
+                    placeholder="Search text..."
+                    className="h-8"
+                    autoFocus
+                  />
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {searchResults.length > 0 ? `${currentResultIndex + 1} / ${searchResults.length}` : '0 / 0'}
+                  </span>
+                </form>
+                <div className="flex items-center gap-1">
+                  <Button onClick={prevResult} disabled={searchResults.length === 0} variant="ghost" size="icon" className="h-8 w-8">
+                    <ChevronUp className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={nextResult} disabled={searchResults.length === 0} variant="ghost" size="icon" className="h-8 w-8">
+                    <ChevronDown className="h-4 w-4" />
+                  </Button>
+                  <Button onClick={clearSearch} variant="ghost" size="icon" className="h-8 w-8">
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
 
             {/* Pagination Input */}
             <div className="flex items-center gap-2">
@@ -582,6 +729,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
               </Button>
             )}
           </div>
+          {isSearching && (
+            <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse" />
+          )}
 
           {activeMode === 'edit' && (
             <div className="flex justify-center">
@@ -645,6 +795,9 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                     // Simple lazy loading logic: Render if within +/- 3 pages of current page
                     const isNear = Math.abs(pageNumber - pageNum) <= 2;
 
+                    // Estimate height from page 1 or any loaded page
+                    const estimatedPageHeight = pagesDimensions[1]?.height || Object.values(pagesDimensions)[0]?.height;
+
                     return (
                       <PDFPage
                         key={pageNum}
@@ -659,8 +812,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                         scale={scale}
                         containerWidth={containerWidth}
                         shouldRender={isNear || pageNum === 1} // Always render page 1 to start
+                        defaultHeight={estimatedPageHeight}
                         onAddAnnotation={(pos) => onPageAddAnnotation(pos, pageNum)}
                         onDimensionsChange={(w, h) => handlePageDimensionsChange(pageNum, w, h)}
+                        searchQuery={debouncedSearchQuery}
+                        focusedMatchIndex={
+                          searchResults[currentResultIndex]?.page === pageNum
+                            ? searchResults[currentResultIndex].matchIndexOnPage
+                            : null
+                        }
                       />
                     );
                   })}
