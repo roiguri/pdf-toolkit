@@ -11,11 +11,29 @@ import {
   where,
   orderBy,
   onSnapshot,
-
   serverTimestamp,
   setDoc,
 } from 'firebase/firestore';
 import { User as FirebaseAuthUser } from 'firebase/auth';
+
+export type AnnotationType = 'text' | 'signature' | 'highlight';
+
+export interface Annotation {
+  id: string;
+  pageNumber: number;
+  type: AnnotationType;
+  position: { x: number; y: number }; // Relative coordinates (0-1)
+  content: string; // Text content, base64 signature image, or highlight text
+  rects?: { x: number; y: number; width: number; height: number }[]; // For highlights: relative coordinates
+  style?: {
+    fontSize?: number;
+    fontColor?: string;
+    width?: number;
+    height?: number;
+    color?: string; // For highlights
+    opacity?: number; // For highlights
+  };
+}
 
 export interface FileMetadata {
   id: string; // Stored as document ID
@@ -28,6 +46,8 @@ export interface FileMetadata {
   lastModified: Date;
   pageCount?: number; // Optional
   folderId?: string | null; // ID of the parent folder, or null for root
+  annotations?: Annotation[];
+  bookmarks?: number[];
 }
 
 const USERS_COLLECTION = 'users';

@@ -4,6 +4,8 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Page } from 'react-pdf';
 import { Loader2 } from 'lucide-react';
 import AnnotationOverlay from './AnnotationOverlay';
+import TextSelectionMenu from './TextSelectionMenu';
+import { useAppStore } from '@/store/useAppStore';
 
 interface PDFPageProps {
   pageNumber: number;
@@ -42,8 +44,13 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
 }, ref) => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const [highlights, setHighlights] = useState<HighlightRect[]>([]);
+  const [selectionMenuPosition, setSelectionMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [selectedRects, setSelectedRects] = useState<{ x: number; y: number; width: number; height: number }[]>([]);
+  const [selectedText, setSelectedText] = useState('');
+
   const pageContentRef = useRef<HTMLDivElement>(null);
   const textLayerRendered = useRef(false);
+  const { addAnnotation, activeMode } = useAppStore();
 
   // Function to calculate highlights without modifying DOM
   const calculateHighlights = useCallback(() => {
@@ -230,6 +237,86 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     };
   }, [pageNumber, scale, containerWidth, shouldRender, onDimensionsChange]);
 
+  // Handle text selection
+  useEffect(() => {
+    const handleSelection = () => {
+      if (!pageContentRef.current) return;
+      // We allow selection in any mode, but specific actions might be restricted
+      // If we want highlighting only in 'edit' or 'view', we can check here.
+      // But typically users expect to be able to select text anywhere.
+
+      const selection = window.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount === 0) {
+        setSelectionMenuPosition(null);
+        return;
+      }
+
+      const range = selection.getRangeAt(0);
+      const containerRect = pageContentRef.current.getBoundingClientRect();
+
+      // Check if selection is inside this page
+      if (!pageContentRef.current.contains(range.commonAncestorContainer)) {
+         // It might be selection crossing pages, which is complex.
+         // We'll ignore cross-page selections or selections not starting in this page for now.
+         // Or if this page is not part of the selection, do nothing.
+         return;
+      }
+
+      // Calculate position for the menu (at the end of selection)
+      const rects = range.getClientRects();
+      if (rects.length === 0) return;
+
+      const lastRect = rects[rects.length - 1];
+
+      // Calculate relative rects for storage
+      const relativeRects = Array.from(rects).map(r => ({
+        x: (r.left - containerRect.left) / containerRect.width,
+        y: (r.top - containerRect.top) / containerRect.height,
+        width: r.width / containerRect.width,
+        height: r.height / containerRect.height
+      }));
+
+      setSelectedRects(relativeRects);
+      setSelectedText(selection.toString());
+
+      setSelectionMenuPosition({
+        top: lastRect.top,
+        left: lastRect.left + lastRect.width / 2
+      });
+    };
+
+    const container = pageContentRef.current;
+    if (container) {
+      document.addEventListener('mouseup', handleSelection);
+      // document.addEventListener('selectionchange', handleSelection); // Too noisy
+    }
+
+    return () => {
+      document.removeEventListener('mouseup', handleSelection);
+    };
+  }, []);
+
+  const handleHighlight = () => {
+    if (selectedRects.length === 0) return;
+
+    addAnnotation({
+      id: crypto.randomUUID(),
+      pageNumber,
+      type: 'highlight',
+      position: { x: 0, y: 0 }, // Placeholder, real data in rects
+      content: selectedText,
+      rects: selectedRects,
+      style: {
+        color: '#ffff00', // Default yellow
+        opacity: 0.4
+      }
+    });
+
+    // Clear selection
+    window.getSelection()?.removeAllRanges();
+    setSelectionMenuPosition(null);
+  };
+
   return (
     <div
       ref={ref}
@@ -263,7 +350,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
           )
         ), [shouldRender, pageNumber, containerWidth, scale, onRenderTextLayerSuccess, canvasDimensions.height, defaultHeight])}
 
-        {/* Highlight Overlay Layer */}
+        {/* Highlight Overlay Layer (Search Results) */}
         <div className="absolute inset-0 pointer-events-none z-10">
           {highlights.map((highlight) => (
             <div
@@ -299,6 +386,12 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             onAddAnnotation={onAddAnnotation}
           />
         )}
+
+        <TextSelectionMenu
+          position={selectionMenuPosition}
+          onHighlight={handleHighlight}
+          onClose={() => setSelectionMenuPosition(null)}
+        />
       </div>
     </div>
   );

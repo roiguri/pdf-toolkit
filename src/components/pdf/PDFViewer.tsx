@@ -20,7 +20,9 @@ import {
   Search,
   ChevronUp,
   ChevronDown,
-  X
+  X,
+  ScrollText,
+  Bookmark
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
@@ -32,6 +34,8 @@ import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
+import { usePdfPersistence } from '@/hooks/usePdfPersistence';
+import BookmarksSidebar from './BookmarksSidebar';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -56,6 +60,9 @@ const DocumentNoData = <p>No PDF file selected or available.</p>;
 const DocumentError = <p>Failed to load PDF. Check CORS settings or file availability.</p>;
 
 export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
+  // Persistence hook
+  usePdfPersistence();
+
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
@@ -64,6 +71,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const [scale, setScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
+  const [showBookmarks, setShowBookmarks] = useState(false);
   const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
 
   // Search state
@@ -85,7 +93,17 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
 
-  const { activeMode, activeEditTool, addAnnotation, annotations, setSelectedAnnotationId, selectedAnnotationId, deleteAnnotation } = useAppStore();
+  const {
+    activeMode,
+    activeEditTool,
+    addAnnotation,
+    annotations,
+    setSelectedAnnotationId,
+    selectedAnnotationId,
+    deleteAnnotation,
+    bookmarks,
+    toggleBookmark
+  } = useAppStore();
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -138,12 +156,6 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       }
     };
 
-    // 'pan-x pan-y' allows browser scrolling (which is 1-finger) 
-    // but tells browser we might handle 2-finger gestures or browser zoom shouldn't happen?
-    // Actually 'pan-x pan-y' tells the browser "I only handle panning, you can handle zoom".
-    // Wait, we WANT to handle zoom. So we should disable browser zoom.
-    // 'pan-x pan-y' allows panning but DISABLES double-tap zoom usually.
-    // To disable pinch zoom, we often resort to preventDefault on 2 fingers (implemented above).
     container.style.touchAction = 'pan-x pan-y';
 
     container.addEventListener('touchstart', handleTouchStart, { passive: false });
@@ -199,7 +211,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   // Toggle thumbnails sidebar
   const toggleThumbnails = useCallback(() => {
     setShowThumbnails(prev => !prev);
-  }, []);
+    if (!showThumbnails) setShowBookmarks(false);
+  }, [showThumbnails]);
+
+  // Toggle bookmarks sidebar
+  const toggleBookmarks = useCallback(() => {
+    setShowBookmarks(prev => !prev);
+    if (!showBookmarks) setShowThumbnails(false);
+  }, [showBookmarks]);
 
   // Track container width for responsive PDF scaling
   useEffect(() => {
@@ -532,42 +551,13 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
   // Handle exporting PDF with annotations
   const handleExportWithAnnotations = useCallback(async () => {
-    if (annotations.length === 0) {
-      toast.info('No annotations to export');
+    if (annotations.length === 0 && bookmarks.length === 0) {
+      toast.info('No annotations or bookmarks to export');
       return;
     }
 
     try {
-      toast.info('Exporting PDF with annotations...', { id: 'export-pdf' });
-
-      // Create a map of dimensions for each page that has annotations
-      // But embedAnnotationsInPdf expects a single 'unscaledDimensions' object?
-      // Let's check embedAnnotationsInPdf usage.
-      // It seems the utility might assume same size for all pages or we need to update it.
-      // The previous code passed:
-      // const unscaledDimensions = {
-      //   width: canvasDimensions.width / scale,
-      //   height: canvasDimensions.height / scale,
-      // };
-      // which implies one dimension for the whole doc.
-
-      // If the PDF has varying page sizes, this might be incorrect for some pages.
-      // However, the task is "replace pagination with scrolling", not "fix PDF export for mixed page sizes".
-      // But "Make sure this does not effect any of the tools woth extra care on edit".
-
-      // I should check if I can pass per-page dimensions to embedAnnotationsInPdf.
-      // If not, I should probably use the dimensions of the FIRST page, or the page of the annotation.
-
-      // Let's peek at `embedAnnotationsInPdf` signature in memory or assuming standard.
-      // Current usage: embedAnnotationsInPdf(url, annotations, dimensions).
-
-      // I will assume for now we use the dimensions of the first page or a dominant page.
-      // Or better, I can iterate and find the dimension for each annotation's page.
-      // But the function signature suggests one dimension arg.
-
-      // Let's stick to using the dimension of the *current active page* or Page 1?
-      // Using Page 1 is safer if we assume uniform pages.
-      // Using `pagesDimensions[1]` (or any available).
+      toast.info('Exporting PDF...', { id: 'export-pdf' });
 
       const firstPageDims = pagesDimensions[1] || Object.values(pagesDimensions)[0];
 
@@ -587,7 +577,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       const pdfBytes = await embedAnnotationsInPdf(
         file.downloadURL,
         annotations,
-        unscaledDimensions
+        unscaledDimensions,
+        bookmarks
       );
 
       const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
@@ -605,7 +596,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       console.error('Error exporting PDF:', error);
       toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
     }
-  }, [annotations, file, pagesDimensions, scale]);
+  }, [annotations, file, pagesDimensions, scale, bookmarks]);
 
   // Handle delete key
   useEffect(() => {
@@ -635,6 +626,10 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
           <div className="flex flex-wrap items-center justify-center gap-2 w-full relative">
             <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? 'Hide pages' : 'Show pages'}>
               {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+            </Button>
+
+            <Button onClick={toggleBookmarks} variant="outline" size="icon" title={showBookmarks ? 'Hide bookmarks' : 'Show bookmarks'}>
+              <ScrollText className="h-4 w-4" />
             </Button>
 
             <Button
@@ -697,6 +692,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                 / {numPages || '...'}
               </span>
             </div>
+
+            <Button
+              onClick={() => toggleBookmark(pageNumber)}
+              variant={bookmarks.includes(pageNumber) ? "default" : "outline"}
+              size="icon"
+              title={bookmarks.includes(pageNumber) ? "Remove bookmark" : "Bookmark this page"}
+            >
+              <Bookmark className={`h-4 w-4 ${bookmarks.includes(pageNumber) ? "fill-current" : ""}`} />
+            </Button>
 
             {/* Zoom controls */}
             <div className="flex items-center gap-1 ml-2">
@@ -770,6 +774,11 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                   ))}
                 </Document>
               </div>
+            )}
+
+            {/* Bookmarks Sidebar */}
+            {showBookmarks && (
+              <BookmarksSidebar onScrollToPage={scrollToPage} />
             )}
 
             {/* Scrollable PDF List */}

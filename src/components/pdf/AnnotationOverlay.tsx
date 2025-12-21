@@ -78,17 +78,14 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
         // Validate canvas dimensions
         if (canvasWidth <= 0 || canvasHeight <= 0) return null;
 
-        // Validate annotation position is within bounds
-        if (annotation.position.x < 0 || annotation.position.x > 1 ||
-          annotation.position.y < 0 || annotation.position.y > 1) {
-          console.warn(`Annotation ${annotation.id} has invalid position:`, annotation.position);
-          return null;
-        }
-
-        const absoluteX = annotation.position.x * canvasWidth;
-        const absoluteY = annotation.position.y * canvasHeight;
-
         if (annotation.type === 'signature') {
+           // Validate annotation position is within bounds
+            if (annotation.position.x < 0 || annotation.position.x > 1 ||
+            annotation.position.y < 0 || annotation.position.y > 1) {
+            console.warn(`Annotation ${annotation.id} has invalid position:`, annotation.position);
+            return null;
+            }
+
           return (
             <SignatureAnnotation
               key={annotation.id}
@@ -101,6 +98,37 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
               onDelete={() => handleAnnotationDelete(annotation.id)}
               onUpdate={(updates) => handleAnnotationUpdate(annotation.id, updates)}
             />
+          );
+        }
+
+        if (annotation.type === 'highlight' && annotation.rects) {
+          const isSelected = selectedAnnotationId === annotation.id;
+          return (
+            <div
+              key={annotation.id}
+              style={{ pointerEvents: 'auto' }} // Allow clicking highlights
+              onClick={(e) => {
+                e.stopPropagation();
+                handleAnnotationSelect(annotation.id);
+              }}
+            >
+              {annotation.rects.map((rect, i) => (
+                <div
+                  key={i}
+                  className="absolute cursor-pointer transition-colors"
+                  style={{
+                    top: rect.y * canvasHeight,
+                    left: rect.x * canvasWidth,
+                    width: rect.width * canvasWidth,
+                    height: rect.height * canvasHeight,
+                    backgroundColor: annotation.style?.color || '#ffff00',
+                    opacity: isSelected ? 0.7 : (annotation.style?.opacity || 0.4),
+                    border: isSelected ? '2px solid blue' : 'none',
+                  }}
+                  title={annotation.content}
+                />
+              ))}
+            </div>
           );
         }
 

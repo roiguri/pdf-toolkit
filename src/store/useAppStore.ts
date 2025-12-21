@@ -1,24 +1,10 @@
 // src/store/useAppStore.ts
 import { create } from 'zustand';
-import { FileMetadata } from '@/services/firestore'; // Assuming FileMetadata is defined here
+import { FileMetadata, Annotation, AnnotationType } from '@/services/firestore';
+// Re-export Annotation and AnnotationType for convenience if needed, but components should import from firestore usually
+export type { Annotation, AnnotationType };
 
 export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
-
-export type AnnotationType = 'text' | 'signature';
-
-export interface Annotation {
-  id: string;
-  pageNumber: number;
-  type: AnnotationType;
-  position: { x: number; y: number }; // Relative coordinates (0-1)
-  content: string; // Text content or base64 signature image
-  style?: {
-    fontSize?: number;
-    fontColor?: string;
-    width?: number;
-    height?: number;
-  };
-}
 
 interface AppState {
   selectedFileId: string | null;
@@ -27,6 +13,7 @@ interface AppState {
   mergeSelection: string[];
   // Annotation state
   annotations: Annotation[];
+  bookmarks: number[];
   activeEditTool: AnnotationType;
   selectedAnnotationId: string | null;
   // Compression state
@@ -51,6 +38,13 @@ interface AppState {
   deleteAnnotation: (id: string) => void;
   setSelectedAnnotationId: (id: string | null) => void;
   clearAnnotations: () => void;
+  setAnnotations: (annotations: Annotation[]) => void;
+  // Bookmark actions
+  addBookmark: (pageNumber: number) => void;
+  removeBookmark: (pageNumber: number) => void;
+  toggleBookmark: (pageNumber: number) => void;
+  setBookmarks: (bookmarks: number[]) => void;
+
   // Compression actions
   setCompressionStatus: (isCompressing: boolean, controller?: AbortController | null) => void;
   reset: () => void;
@@ -63,19 +57,39 @@ const initialState = {
   currentFolderId: null, // Default to root
   mergeSelection: [],
   annotations: [] as Annotation[],
+  bookmarks: [] as number[],
   activeEditTool: 'signature' as AnnotationType,
   selectedAnnotationId: null,
   isCompressing: false,
   compressAbortController: null,
 };
 
-export const useAppStore = create<AppState>((set) => ({
+export const useAppStore = create<AppState>((set, get) => ({
   ...initialState,
 
   setCurrentFolderId: (id) => set({ currentFolderId: id }),
-  setSelectedFileId: (id) => set({ selectedFileId: id }),
+  setSelectedFileId: (id) => {
+    // When file changes, try to load its annotations and bookmarks
+    const state = get();
+    const file = state.files.find((f) => f.id === id);
+    set({
+      selectedFileId: id,
+      annotations: file?.annotations || [],
+      bookmarks: file?.bookmarks || [],
+    });
+  },
   setActiveMode: (mode) => set({ activeMode: mode }),
-  setFiles: (files) => set({ files }),
+  setFiles: (files) => {
+    // When files list updates (e.g. from firestore subscription), update annotations/bookmarks for current file
+    set((state) => {
+      const currentFile = files.find((f) => f.id === state.selectedFileId);
+      return {
+        files,
+        annotations: currentFile?.annotations || state.annotations,
+        bookmarks: currentFile?.bookmarks || state.bookmarks,
+      };
+    });
+  },
   addFileToMergeSelection: (fileId) =>
     set((state) => ({ mergeSelection: [...state.mergeSelection, fileId] })),
   removeFileFromMergeSelection: (fileId) =>
@@ -107,6 +121,26 @@ export const useAppStore = create<AppState>((set) => ({
     })),
   setSelectedAnnotationId: (id) => set({ selectedAnnotationId: id }),
   clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
+  setAnnotations: (annotations) => set({ annotations }),
+
+  // Bookmark actions
+  addBookmark: (pageNumber) =>
+    set((state) => {
+      if (state.bookmarks.includes(pageNumber)) return state;
+      return { bookmarks: [...state.bookmarks, pageNumber].sort((a, b) => a - b) };
+    }),
+  removeBookmark: (pageNumber) =>
+    set((state) => ({ bookmarks: state.bookmarks.filter((b) => b !== pageNumber) })),
+  toggleBookmark: (pageNumber) =>
+    set((state) => {
+      if (state.bookmarks.includes(pageNumber)) {
+        return { bookmarks: state.bookmarks.filter((b) => b !== pageNumber) };
+      }
+      return { bookmarks: [...state.bookmarks, pageNumber].sort((a, b) => a - b) };
+    }),
+  setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a - b) }),
+
+
   // Compression actions
   setCompressionStatus: (isCompressing, controller = null) =>
     set({ isCompressing, compressAbortController: controller }),

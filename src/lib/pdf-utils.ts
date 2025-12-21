@@ -1,7 +1,6 @@
 // src/lib/pdf-utils.ts
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib';
-import { FileMetadata } from '@/services/firestore';
-import { Annotation } from '@/store/useAppStore';
+import { PDFDocument, StandardFonts, rgb, PDFName, PDFDict, PDFRef } from 'pdf-lib';
+import { Annotation } from '@/services/firestore';
 
 /**
  * Downloads a file to the user's browser.
@@ -129,12 +128,14 @@ export const mergePdfs = async (
  * @param pdfUrl The URL of the PDF to annotate.
  * @param annotations The annotations to embed.
  * @param canvasDimensions The dimensions of the rendered canvas (for coordinate conversion).
+ * @param bookmarks Optional list of page numbers to bookmark.
  * @returns The bytes of the annotated PDF.
  */
 export const embedAnnotationsInPdf = async (
   pdfUrl: string,
   annotations: Annotation[],
-  canvasDimensions: { width: number; height: number }
+  canvasDimensions: { width: number; height: number },
+  bookmarks?: number[]
 ): Promise<Uint8Array> => {
   // Fetch the original PDF
   const response = await fetch(pdfUrl);
@@ -143,6 +144,16 @@ export const embedAnnotationsInPdf = async (
 
   // Embed the font for text annotations
   const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
+  // Parse hex color to RGB
+  const hexToRgb = (hex: string) => {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result ? {
+      r: parseInt(result[1], 16) / 255,
+      g: parseInt(result[2], 16) / 255,
+      b: parseInt(result[3], 16) / 255,
+    } : { r: 0, g: 0, b: 0 };
+  };
 
   // Process each annotation
   for (const annotation of annotations) {
@@ -160,16 +171,6 @@ export const embedAnnotationsInPdf = async (
     if (annotation.type === 'text') {
       const fontSize = annotation.style?.fontSize || 16;
       const fontColor = annotation.style?.fontColor || '#000000';
-
-      // Parse hex color to RGB
-      const hexToRgb = (hex: string) => {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-          r: parseInt(result[1], 16) / 255,
-          g: parseInt(result[2], 16) / 255,
-          b: parseInt(result[3], 16) / 255,
-        } : { r: 0, g: 0, b: 0 };
-      };
 
       const color = hexToRgb(fontColor);
 
@@ -226,6 +227,83 @@ export const embedAnnotationsInPdf = async (
       } catch (error) {
         console.error('Error embedding signature:', error);
       }
+    } else if (annotation.type === 'highlight' && annotation.rects) {
+      const highlightColor = annotation.style?.color || '#ffff00';
+      const opacity = annotation.style?.opacity || 0.4;
+      const color = hexToRgb(highlightColor);
+
+      annotation.rects.forEach(rect => {
+        // Convert relative rect (0-1) to PDF coordinates
+        const x = rect.x * pageWidth;
+        const width = rect.width * pageWidth;
+        const height = rect.height * pageHeight;
+
+        // y is from top in our data, but pdf is from bottom
+        const y = pageHeight - (rect.y * pageHeight) - height;
+
+        page.drawRectangle({
+          x,
+          y,
+          width,
+          height,
+          color: rgb(color.r, color.g, color.b),
+          opacity,
+        });
+      });
+    }
+  }
+
+  // Create Bookmarks (Outlines)
+  if (bookmarks && bookmarks.length > 0) {
+    try {
+      const sortedBookmarks = [...bookmarks].sort((a, b) => a - b);
+
+      // We need to construct the outline dictionary manually
+      const outlinesDictRef = pdfDoc.context.nextRef();
+      const outlineItemRefs: PDFRef[] = [];
+
+      for (let i = 0; i < sortedBookmarks.length; i++) {
+        outlineItemRefs.push(pdfDoc.context.nextRef());
+      }
+
+      const outlinesDict = pdfDoc.context.obj({
+        Type: 'Outlines',
+        First: outlineItemRefs[0],
+        Last: outlineItemRefs[outlineItemRefs.length - 1],
+        Count: sortedBookmarks.length,
+      });
+
+      pdfDoc.context.assign(outlinesDictRef, outlinesDict);
+
+      // Assign to Catalog
+      pdfDoc.catalog.set(PDFName.of('Outlines'), outlinesDictRef);
+
+      // Create items
+      for (let i = 0; i < sortedBookmarks.length; i++) {
+        const pageNum = sortedBookmarks[i];
+        const pageIndex = pageNum - 1;
+
+        if (pageIndex >= 0 && pageIndex < pdfDoc.getPageCount()) {
+          const page = pdfDoc.getPage(pageIndex);
+          const pageRef = page.ref;
+
+          const itemRef = outlineItemRefs[i];
+          const prevRef = i > 0 ? outlineItemRefs[i - 1] : undefined;
+          const nextRef = i < sortedBookmarks.length - 1 ? outlineItemRefs[i + 1] : undefined;
+
+          const itemDict = pdfDoc.context.obj({
+            Title: `Page ${pageNum}`,
+            Parent: outlinesDictRef,
+            ...(prevRef ? { Prev: prevRef } : {}),
+            ...(nextRef ? { Next: nextRef } : {}),
+            Dest: [pageRef, 'Fit'],
+          });
+
+          pdfDoc.context.assign(itemRef, itemDict);
+        }
+      }
+    } catch (error) {
+      console.error("Error creating bookmarks outline:", error);
     }
   }
 
