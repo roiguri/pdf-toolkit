@@ -124,7 +124,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       selectedAnnotationId: state.selectedAnnotationId === id ? null : state.selectedAnnotationId,
     })),
   setSelectedAnnotationId: (id) =>
-    set({ selectedAnnotationId: id, selectedBookmarkId: null }), // Clear bookmark selection
+    set((state) => {
+      if (state.selectedAnnotationId === id && id !== null) {
+        // Toggle off if already selected
+        return { selectedAnnotationId: null, selectedBookmarkId: null };
+      }
+      return { selectedAnnotationId: id, selectedBookmarkId: null };
+    }),
   clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
   setAnnotations: (annotations) => set({ annotations }),
 
@@ -162,7 +168,13 @@ export const useAppStore = create<AppState>((set, get) => ({
     })),
   setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a.pageNumber - b.pageNumber) }),
   setSelectedBookmarkId: (id) =>
-    set({ selectedBookmarkId: id, selectedAnnotationId: null }), // Clear annotation selection
+    set((state) => {
+      if (state.selectedBookmarkId === id && id !== null) {
+        // Toggle off if already selected
+        return { selectedBookmarkId: null, selectedAnnotationId: null };
+      }
+      return { selectedBookmarkId: id, selectedAnnotationId: null };
+    }),
 
   // Compression actions
   setCompressionStatus: (isCompressing, controller = null) =>

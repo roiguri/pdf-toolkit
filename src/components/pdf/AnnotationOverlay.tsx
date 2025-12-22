@@ -115,16 +115,19 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
               {annotation.rects.map((rect, i) => (
                 <div
                   key={i}
-                  className={`absolute cursor-pointer transition-all ${isSelected ? 'animate-pulse' : ''}`}
+                  className="absolute cursor-pointer transition-all duration-300"
                   style={{
                     top: rect.y * canvasHeight,
                     left: rect.x * canvasWidth,
                     width: rect.width * canvasWidth,
                     height: rect.height * canvasHeight,
                     backgroundColor: annotation.style?.color || '#ffff00',
-                    opacity: isSelected ? 0.8 : (annotation.style?.opacity || 0.4),
-                    border: isSelected ? '2px solid blue' : 'none',
-                    boxShadow: isSelected ? '0 0 0 2px rgba(59, 130, 246, 0.5)' : 'none',
+                    // Increased opacity and saturation for selected state
+                    opacity: isSelected ? 0.7 : (annotation.style?.opacity || 0.4),
+                    // Removed border, added glow/shadow for selected state
+                    boxShadow: isSelected ? `0 0 8px 2px ${annotation.style?.color || '#ffff00'}` : 'none',
+                    // Slight scale up for selected state
+                    transform: isSelected ? 'scale(1.02)' : 'scale(1)',
                     zIndex: isSelected ? 10 : 1,
                   }}
                   title={annotation.content}

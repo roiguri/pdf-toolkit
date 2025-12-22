@@ -102,7 +102,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     selectedAnnotationId,
     deleteAnnotation,
     bookmarks,
-    toggleBookmark
+    toggleBookmark,
+    setSelectedBookmarkId
   } = useAppStore();
 
   const isBookmarked = bookmarks.some(b => b.pageNumber === pageNumber);
@@ -617,6 +618,15 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [activeMode, selectedAnnotationId, deleteAnnotation, setSelectedAnnotationId]);
 
+  // Deselect when clicking the background
+  const handleBackgroundClick = (e: React.MouseEvent) => {
+    // If the click target is the container itself or a direct padding area, not a page
+    if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('react-pdf__Document')) {
+      setSelectedAnnotationId(null);
+      setSelectedBookmarkId(null);
+    }
+  };
+
   return (
     <div
       ref={viewerContainerRef}
@@ -789,6 +799,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                 }`}
               ref={pageContainerRef}
               {...bind()}
+              onClick={handleBackgroundClick} // Handle outside click
             >
               <div
                 ref={pdfContentRef}
