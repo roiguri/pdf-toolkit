@@ -296,7 +296,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     };
   }, []);
 
-  const handleHighlight = () => {
+  const handleHighlight = (color: string) => {
     if (selectedRects.length === 0) return;
 
     addAnnotation({
@@ -307,7 +307,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
       content: selectedText,
       rects: selectedRects,
       style: {
-        color: '#ffff00', // Default yellow
+        color: color || '#ffff00', // Use selected color or default yellow
         opacity: 0.4
       }
     });

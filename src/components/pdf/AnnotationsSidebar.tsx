@@ -50,15 +50,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
       setEditTitle(item.data.title);
       setEditNote(item.data.note || '');
     } else {
-      setEditTitle(item.data.content); // For highlight, title edits the content? Usually not, but maybe just note?
-      // Actually, user said "name bookmarks/highlights".
-      // For highlight, naming it might mean changing its displayed "title" in this list, not the content text itself.
-      // But Annotation structure doesn't have a "title" field, just "content".
-      // Let's assume for highlight we only edit the NOTE, unless we want to hack "content" which is the actual text.
-      // Modifying the actual text of a highlight annotation (the selected text) is weird.
-      // Let's stick to editing the NOTE for highlights.
-      // Wait, request said "name ... highlights". Maybe I should add a title field to Annotation too?
-      // I only added `note`. I'll stick to editing `note` for highlights for now, or use `note` as the "name/description".
+      setEditTitle(item.data.content); // For highlight, we don't really edit content, but for consistency state
       setEditNote(item.data.note || '');
     }
   };
@@ -67,8 +59,6 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
     if (item.type === 'bookmark') {
       updateBookmark(item.data.id, { title: editTitle, note: editNote });
     } else {
-      // For highlight, we update the note.
-      // If we want to "name" it, maybe we prepend to note or just use note?
       updateAnnotation(item.data.id, { note: editNote });
     }
     setEditingId(null);
@@ -104,7 +94,10 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
                   {item.type === 'bookmark' ? (
                     <ScrollText className="h-3 w-3" />
                   ) : (
-                    <Highlighter className="h-3 w-3 text-yellow-600" />
+                    <Highlighter
+                      className="h-3 w-3"
+                      style={{ color: item.data.style?.color || '#eab308' }} // Default yellow-600
+                    />
                   )}
                   Page {item.data.pageNumber}
                 </div>
@@ -159,7 +152,8 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
                     </div>
                   ) : (
                     <div
-                      className="text-sm italic text-muted-foreground line-clamp-2 border-l-2 border-yellow-300 pl-2 my-1"
+                      className="text-sm italic text-muted-foreground line-clamp-2 border-l-2 pl-2 my-1"
+                      style={{ borderLeftColor: item.data.style?.color || '#fde047' }} // Default yellow-300
                       title={item.data.content}
                     >
                       "{item.data.content}"
