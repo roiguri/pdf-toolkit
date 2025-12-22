@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAppStore, Bookmark, Annotation } from '@/store/useAppStore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,23 @@ type ListItem =
   | { type: 'highlight'; data: Annotation };
 
 const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage }) => {
-  const { bookmarks, annotations, removeBookmark, updateBookmark, deleteAnnotation, updateAnnotation } = useAppStore();
+  const {
+    bookmarks,
+    annotations,
+    removeBookmark,
+    updateBookmark,
+    deleteAnnotation,
+    updateAnnotation,
+    selectedBookmarkId,
+    selectedAnnotationId,
+    setSelectedBookmarkId,
+    setSelectedAnnotationId
+  } = useAppStore();
+
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editNote, setEditNote] = useState('');
+  const itemRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Combine and sort items
   const highlights = annotations.filter(a => a.type === 'highlight');
@@ -33,6 +46,17 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
     // Tertiary: creation time if available, or just random stability
     return 0;
   });
+
+  // Auto-scroll to selected item
+  useEffect(() => {
+    const selectedId = selectedBookmarkId || selectedAnnotationId;
+    if (selectedId) {
+      const el = itemRefs.current.get(selectedId);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+    }
+  }, [selectedBookmarkId, selectedAnnotationId]);
 
   if (items.length === 0) {
     return (
@@ -50,7 +74,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
       setEditTitle(item.data.title);
       setEditNote(item.data.note || '');
     } else {
-      setEditTitle(item.data.content); // For highlight, we don't really edit content, but for consistency state
+      setEditTitle(item.data.content);
       setEditNote(item.data.note || '');
     }
   };
@@ -70,6 +94,15 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
     setEditNote('');
   };
 
+  const handleItemClick = (item: ListItem) => {
+    if (item.type === 'bookmark') {
+      setSelectedBookmarkId(item.data.id);
+    } else {
+      setSelectedAnnotationId(item.data.id);
+    }
+    onScrollToPage(item.data.pageNumber);
+  };
+
   return (
     <div className="w-72 border-l bg-background flex flex-col h-full">
       <div className="p-3 border-b font-medium flex items-center gap-2">
@@ -79,17 +112,24 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {items.map((item) => {
           const isEditing = editingId === item.data.id;
+          const isSelected = item.data.id === selectedBookmarkId || item.data.id === selectedAnnotationId;
 
           return (
             <div
               key={item.data.id}
-              className="border rounded-md p-2 bg-card text-card-foreground shadow-sm hover:shadow-md transition-shadow relative group"
+              ref={(el) => {
+                if (el) itemRefs.current.set(item.data.id, el);
+                else itemRefs.current.delete(item.data.id);
+              }}
+              className={`border rounded-md p-2 bg-card text-card-foreground shadow-sm hover:shadow-md transition-all relative group ${
+                isSelected ? 'ring-2 ring-primary border-primary' : ''
+              }`}
             >
               {/* Header: Icon + Page Num */}
               <div className="flex items-center justify-between mb-1">
                 <div
                   className="flex items-center gap-2 cursor-pointer text-xs font-semibold text-muted-foreground"
-                  onClick={() => onScrollToPage(item.data.pageNumber)}
+                  onClick={() => handleItemClick(item)}
                 >
                   {item.type === 'bookmark' ? (
                     <ScrollText className="h-3 w-3" />
@@ -103,14 +143,17 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
                 </div>
                 {!isEditing && (
                   <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => startEditing(item)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={(e) => { e.stopPropagation(); startEditing(item); }}>
                       <Edit2 className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="ghost"
                       size="icon"
                       className="h-6 w-6 text-destructive"
-                      onClick={() => item.type === 'bookmark' ? removeBookmark(item.data.id) : deleteAnnotation(item.data.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        item.type === 'bookmark' ? removeBookmark(item.data.id) : deleteAnnotation(item.data.id);
+                      }}
                     >
                       <Trash2 className="h-3 w-3" />
                     </Button>
@@ -145,7 +188,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
                   </div>
                 </div>
               ) : (
-                <div onClick={() => onScrollToPage(item.data.pageNumber)} className="cursor-pointer">
+                <div onClick={() => handleItemClick(item)} className="cursor-pointer">
                   {item.type === 'bookmark' ? (
                     <div className="font-medium text-sm truncate" title={item.data.title}>
                       {item.data.title}

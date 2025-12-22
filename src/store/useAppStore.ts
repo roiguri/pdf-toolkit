@@ -16,6 +16,7 @@ interface AppState {
   bookmarks: Bookmark[];
   activeEditTool: AnnotationType;
   selectedAnnotationId: string | null;
+  selectedBookmarkId: string | null;
   // Compression state
   isCompressing: boolean;
   compressAbortController: AbortController | null;
@@ -45,6 +46,7 @@ interface AppState {
   toggleBookmark: (pageNumber: number) => void;
   updateBookmark: (id: string, updates: Partial<Bookmark>) => void;
   setBookmarks: (bookmarks: Bookmark[]) => void;
+  setSelectedBookmarkId: (id: string | null) => void;
 
   // Compression actions
   setCompressionStatus: (isCompressing: boolean, controller?: AbortController | null) => void;
@@ -61,6 +63,7 @@ const initialState = {
   bookmarks: [] as Bookmark[],
   activeEditTool: 'signature' as AnnotationType,
   selectedAnnotationId: null,
+  selectedBookmarkId: null,
   isCompressing: false,
   compressAbortController: null,
 };
@@ -120,7 +123,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       annotations: state.annotations.filter((ann) => ann.id !== id),
       selectedAnnotationId: state.selectedAnnotationId === id ? null : state.selectedAnnotationId,
     })),
-  setSelectedAnnotationId: (id) => set({ selectedAnnotationId: id }),
+  setSelectedAnnotationId: (id) =>
+    set({ selectedAnnotationId: id, selectedBookmarkId: null }), // Clear bookmark selection
   clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
   setAnnotations: (annotations) => set({ annotations }),
 
@@ -157,6 +161,8 @@ export const useAppStore = create<AppState>((set, get) => ({
       bookmarks: state.bookmarks.map((b) => (b.id === id ? { ...b, ...updates } : b)),
     })),
   setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a.pageNumber - b.pageNumber) }),
+  setSelectedBookmarkId: (id) =>
+    set({ selectedBookmarkId: id, selectedAnnotationId: null }), // Clear annotation selection
 
   // Compression actions
   setCompressionStatus: (isCompressing, controller = null) =>
