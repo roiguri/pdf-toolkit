@@ -22,7 +22,7 @@ import {
   ChevronDown,
   X,
   ScrollText,
-  Bookmark
+  Bookmark as BookmarkIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
@@ -35,7 +35,7 @@ import { useAuth } from '@/components/auth/AuthProvider';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
 import { usePdfPersistence } from '@/hooks/usePdfPersistence';
-import BookmarksSidebar from './BookmarksSidebar';
+import AnnotationsSidebar from './AnnotationsSidebar';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -104,6 +104,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
     bookmarks,
     toggleBookmark
   } = useAppStore();
+
+  const isBookmarked = bookmarks.some(b => b.pageNumber === pageNumber);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -695,11 +697,11 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
             <Button
               onClick={() => toggleBookmark(pageNumber)}
-              variant={bookmarks.includes(pageNumber) ? "default" : "outline"}
+              variant={isBookmarked ? "default" : "outline"}
               size="icon"
-              title={bookmarks.includes(pageNumber) ? "Remove bookmark" : "Bookmark this page"}
+              title={isBookmarked ? "Remove bookmark" : "Bookmark this page"}
             >
-              <Bookmark className={`h-4 w-4 ${bookmarks.includes(pageNumber) ? "fill-current" : ""}`} />
+              <BookmarkIcon className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
             </Button>
 
             {/* Zoom controls */}
@@ -778,7 +780,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
             {/* Bookmarks Sidebar */}
             {showBookmarks && (
-              <BookmarksSidebar onScrollToPage={scrollToPage} />
+              <AnnotationsSidebar onScrollToPage={scrollToPage} />
             )}
 
             {/* Scrollable PDF List */}

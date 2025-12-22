@@ -1,6 +1,6 @@
 // src/lib/pdf-utils.ts
 import { PDFDocument, StandardFonts, rgb, PDFName, PDFDict, PDFRef } from 'pdf-lib';
-import { Annotation } from '@/services/firestore';
+import { Annotation, Bookmark } from '@/services/firestore';
 
 /**
  * Downloads a file to the user's browser.
@@ -128,14 +128,14 @@ export const mergePdfs = async (
  * @param pdfUrl The URL of the PDF to annotate.
  * @param annotations The annotations to embed.
  * @param canvasDimensions The dimensions of the rendered canvas (for coordinate conversion).
- * @param bookmarks Optional list of page numbers to bookmark.
+ * @param bookmarks Optional list of bookmarks.
  * @returns The bytes of the annotated PDF.
  */
 export const embedAnnotationsInPdf = async (
   pdfUrl: string,
   annotations: Annotation[],
   canvasDimensions: { width: number; height: number },
-  bookmarks?: number[]
+  bookmarks?: Bookmark[]
 ): Promise<Uint8Array> => {
   // Fetch the original PDF
   const response = await fetch(pdfUrl);
@@ -256,7 +256,7 @@ export const embedAnnotationsInPdf = async (
   // Create Bookmarks (Outlines)
   if (bookmarks && bookmarks.length > 0) {
     try {
-      const sortedBookmarks = [...bookmarks].sort((a, b) => a - b);
+      const sortedBookmarks = [...bookmarks].sort((a, b) => a.pageNumber - b.pageNumber);
 
       // We need to construct the outline dictionary manually
       const outlinesDictRef = pdfDoc.context.nextRef();
@@ -280,7 +280,8 @@ export const embedAnnotationsInPdf = async (
 
       // Create items
       for (let i = 0; i < sortedBookmarks.length; i++) {
-        const pageNum = sortedBookmarks[i];
+        const bookmark = sortedBookmarks[i];
+        const pageNum = bookmark.pageNumber;
         const pageIndex = pageNum - 1;
 
         if (pageIndex >= 0 && pageIndex < pdfDoc.getPageCount()) {
@@ -292,7 +293,7 @@ export const embedAnnotationsInPdf = async (
           const nextRef = i < sortedBookmarks.length - 1 ? outlineItemRefs[i + 1] : undefined;
 
           const itemDict = pdfDoc.context.obj({
-            Title: `Page ${pageNum}`,
+            Title: bookmark.title || `Page ${pageNum}`,
             Parent: outlinesDictRef,
             ...(prevRef ? { Prev: prevRef } : {}),
             ...(nextRef ? { Next: nextRef } : {}),

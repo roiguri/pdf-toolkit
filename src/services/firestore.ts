@@ -33,6 +33,15 @@ export interface Annotation {
     color?: string; // For highlights
     opacity?: number; // For highlights
   };
+  note?: string; // User note associated with the annotation
+}
+
+export interface Bookmark {
+  id: string;
+  pageNumber: number;
+  title: string;
+  note?: string;
+  createdAt: number;
 }
 
 export interface FileMetadata {
@@ -47,7 +56,7 @@ export interface FileMetadata {
   pageCount?: number; // Optional
   folderId?: string | null; // ID of the parent folder, or null for root
   annotations?: Annotation[];
-  bookmarks?: number[];
+  bookmarks?: Bookmark[];
 }
 
 const USERS_COLLECTION = 'users';

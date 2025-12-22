@@ -1,8 +1,8 @@
 // src/store/useAppStore.ts
 import { create } from 'zustand';
-import { FileMetadata, Annotation, AnnotationType } from '@/services/firestore';
-// Re-export Annotation and AnnotationType for convenience if needed, but components should import from firestore usually
-export type { Annotation, AnnotationType };
+import { FileMetadata, Annotation, AnnotationType, Bookmark } from '@/services/firestore';
+// Re-export types
+export type { Annotation, AnnotationType, Bookmark };
 
 export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
 
@@ -13,7 +13,7 @@ interface AppState {
   mergeSelection: string[];
   // Annotation state
   annotations: Annotation[];
-  bookmarks: number[];
+  bookmarks: Bookmark[];
   activeEditTool: AnnotationType;
   selectedAnnotationId: string | null;
   // Compression state
@@ -41,9 +41,10 @@ interface AppState {
   setAnnotations: (annotations: Annotation[]) => void;
   // Bookmark actions
   addBookmark: (pageNumber: number) => void;
-  removeBookmark: (pageNumber: number) => void;
+  removeBookmark: (id: string) => void;
   toggleBookmark: (pageNumber: number) => void;
-  setBookmarks: (bookmarks: number[]) => void;
+  updateBookmark: (id: string, updates: Partial<Bookmark>) => void;
+  setBookmarks: (bookmarks: Bookmark[]) => void;
 
   // Compression actions
   setCompressionStatus: (isCompressing: boolean, controller?: AbortController | null) => void;
@@ -57,7 +58,7 @@ const initialState = {
   currentFolderId: null, // Default to root
   mergeSelection: [],
   annotations: [] as Annotation[],
-  bookmarks: [] as number[],
+  bookmarks: [] as Bookmark[],
   activeEditTool: 'signature' as AnnotationType,
   selectedAnnotationId: null,
   isCompressing: false,
@@ -126,20 +127,36 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Bookmark actions
   addBookmark: (pageNumber) =>
     set((state) => {
-      if (state.bookmarks.includes(pageNumber)) return state;
-      return { bookmarks: [...state.bookmarks, pageNumber].sort((a, b) => a - b) };
+      if (state.bookmarks.some((b) => b.pageNumber === pageNumber)) return state;
+      const newBookmark: Bookmark = {
+        id: crypto.randomUUID(),
+        pageNumber,
+        title: `Page ${pageNumber}`,
+        createdAt: Date.now(),
+      };
+      return { bookmarks: [...state.bookmarks, newBookmark].sort((a, b) => a.pageNumber - b.pageNumber) };
     }),
-  removeBookmark: (pageNumber) =>
-    set((state) => ({ bookmarks: state.bookmarks.filter((b) => b !== pageNumber) })),
+  removeBookmark: (id) =>
+    set((state) => ({ bookmarks: state.bookmarks.filter((b) => b.id !== id) })),
   toggleBookmark: (pageNumber) =>
     set((state) => {
-      if (state.bookmarks.includes(pageNumber)) {
-        return { bookmarks: state.bookmarks.filter((b) => b !== pageNumber) };
+      const existing = state.bookmarks.find((b) => b.pageNumber === pageNumber);
+      if (existing) {
+        return { bookmarks: state.bookmarks.filter((b) => b.id !== existing.id) };
       }
-      return { bookmarks: [...state.bookmarks, pageNumber].sort((a, b) => a - b) };
+      const newBookmark: Bookmark = {
+        id: crypto.randomUUID(),
+        pageNumber,
+        title: `Page ${pageNumber}`,
+        createdAt: Date.now(),
+      };
+      return { bookmarks: [...state.bookmarks, newBookmark].sort((a, b) => a.pageNumber - b.pageNumber) };
     }),
-  setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a - b) }),
-
+  updateBookmark: (id, updates) =>
+    set((state) => ({
+      bookmarks: state.bookmarks.map((b) => (b.id === id ? { ...b, ...updates } : b)),
+    })),
+  setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a.pageNumber - b.pageNumber) }),
 
   // Compression actions
   setCompressionStatus: (isCompressing, controller = null) =>
