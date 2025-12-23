@@ -6,12 +6,13 @@ import { useAppStore } from '@/store/useAppStore';
 import { FileMetadata } from '@/services/firestore';
 import ActionToolbar from './ActionToolbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PDFViewer } from '@/components/pdf/PDFViewer'; // Will create PDFViewer
+import { PDFViewer } from '@/components/pdf/PDFViewer';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
-import { splitPdf, mergePdfs, downloadPdf } from '@/lib/pdf-utils';
+import { splitPdf, mergePdfs, downloadPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
 import CompressSidebar from './CompressSidebar';
@@ -21,6 +22,7 @@ const Workspace = () => {
   const selectedFile = files.find((f) => f.id === selectedFileId);
   const [splitPageRanges, setSplitPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
+  const [includeAnnotations, setIncludeAnnotations] = useState(false);
 
   // Map mergeSelection to files, preserving the selection order
   const filesToMerge = mergeSelection
@@ -45,9 +47,21 @@ const Workspace = () => {
     setIsProcessing(true);
     toast.info('Splitting PDF...', { id: 'pdf-processing' });
     try {
-      const arrayBuffer = await fetch(selectedFile.downloadURL).then((res) =>
+      let arrayBuffer = await fetch(selectedFile.downloadURL).then((res) =>
         res.arrayBuffer()
       );
+
+      if (includeAnnotations && (selectedFile.annotations?.length || selectedFile.bookmarks?.length)) {
+        toast.info('Embedding annotations...', { id: 'pdf-processing' });
+        const annotatedBytes = await embedAnnotationsInPdf(
+          arrayBuffer,
+          selectedFile.annotations || [],
+          undefined, // Let it infer dimensions
+          selectedFile.bookmarks
+        );
+        arrayBuffer = annotatedBytes.buffer as ArrayBuffer;
+      }
+
       const output = await splitPdf(arrayBuffer, splitPageRanges, selectedFile.name);
       output.forEach(({ bytes, filename }) => {
         downloadPdf(bytes, filename);
@@ -76,8 +90,18 @@ const Workspace = () => {
           if (!file.downloadURL) {
             throw new Error(`Missing download URL for file: ${file.name}`);
           }
-          const response = await fetch(file.downloadURL);
-          return response.arrayBuffer();
+          let buffer = await fetch(file.downloadURL).then(res => res.arrayBuffer());
+
+          if (includeAnnotations && (file.annotations?.length || file.bookmarks?.length)) {
+             const annotatedBytes = await embedAnnotationsInPdf(
+              buffer,
+              file.annotations || [],
+              undefined,
+              file.bookmarks
+            );
+            buffer = annotatedBytes.buffer as ArrayBuffer;
+          }
+          return buffer;
         })
       );
 
@@ -116,16 +140,31 @@ const Workspace = () => {
             </h3>
             {selectedFile ? (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
-                  <Input
-                    id="page-ranges"
-                    type="text"
-                    value={splitPageRanges}
-                    onChange={(e) => setSplitPageRanges(e.target.value)}
-                    placeholder="e.g., 1, 3-5, 7"
-                    disabled={isProcessing}
-                  />
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
+                    <Input
+                      id="page-ranges"
+                      type="text"
+                      value={splitPageRanges}
+                      onChange={(e) => setSplitPageRanges(e.target.value)}
+                      placeholder="e.g., 1, 3-5, 7"
+                      disabled={isProcessing}
+                    />
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="include-annotations-split"
+                      checked={includeAnnotations}
+                      onCheckedChange={(checked) => setIncludeAnnotations(checked === true)}
+                      disabled={isProcessing}
+                    />
+                    <Label htmlFor="include-annotations-split" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                      Include Annotations & Bookmarks
+                    </Label>
+                  </div>
+
                   <Button onClick={handleSplitPdf} disabled={isProcessing}>
                     {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Split PDF
@@ -143,11 +182,26 @@ const Workspace = () => {
           <div className="space-y-4">
             <h3 className="text-lg font-semibold">Merge PDFs</h3>
             {filesToMerge.length > 0 ? (
-              <div className="space-y-3">
-                <p className="text-sm text-muted-foreground">
-                  Drag to reorder ({filesToMerge.length} selected):
-                </p>
-                <MergeOrderList files={filesToMerge} />
+              <div className="space-y-4">
+                <div className="space-y-3">
+                  <p className="text-sm text-muted-foreground">
+                    Drag to reorder ({filesToMerge.length} selected):
+                  </p>
+                  <MergeOrderList files={filesToMerge} />
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="include-annotations-merge"
+                    checked={includeAnnotations}
+                    onCheckedChange={(checked) => setIncludeAnnotations(checked === true)}
+                    disabled={isProcessing}
+                  />
+                  <Label htmlFor="include-annotations-merge" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+                    Include Annotations & Bookmarks
+                  </Label>
+                </div>
+
                 <Button onClick={handleMergePdfs} disabled={isProcessing || filesToMerge.length < 2}>
                   {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Merge Selected PDFs
