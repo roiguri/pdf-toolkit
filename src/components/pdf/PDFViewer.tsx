@@ -393,7 +393,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
         if (!ctx) throw new Error('Could not get canvas context');
 
-        await page.render({ canvasContext: ctx, viewport }).promise;
+        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
         imageDataUrl = canvas.toDataURL('image/png', 1.0);
       } else {
         // Fast path: existing canvas (likely no annotations needing burning or user unselected highlights and no signatures)
