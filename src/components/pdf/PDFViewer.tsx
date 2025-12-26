@@ -25,6 +25,8 @@ import {
   Bookmark as BookmarkIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
 import { useAppStore } from '@/store/useAppStore';
@@ -73,6 +75,8 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
   const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
+
+  const [includeHighlights, setIncludeHighlights] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -333,24 +337,75 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
 
   const handleDownloadImage = async () => {
-    // Find the current page's element
     const pageEl = pageRefs.current.get(pageNumber);
     if (!pageEl) {
       toast.error('Current page not found.');
       return;
     }
 
-    const canvas = pageEl.querySelector('canvas');
-    if (!canvas) {
-      toast.error('Page rendering not complete. Please wait a moment.');
-      return;
-    }
+    // Determine if we need to burn annotations
+    // We burn if there are any non-highlight annotations, OR if there are highlights and user requested them.
+    const annotationsForPage = annotations.filter(a => a.pageNumber === pageNumber);
+    const hasSignaturesOrText = annotationsForPage.some(a => a.type === 'signature' || a.type === 'text');
+    const hasHighlights = annotationsForPage.some(a => a.type === 'highlight');
+    const shouldBurn = hasSignaturesOrText || (hasHighlights && includeHighlights);
 
     setIsConverting(true);
     toast.info('Converting page to image...', { id: 'image-conversion' });
 
     try {
-      const imageDataUrl = canvas.toDataURL('image/png', 1.0);
+      let imageDataUrl: string;
+
+      if (shouldBurn && file.downloadURL) {
+        // Filter annotations: always keep sigs/text, keep highlights if requested
+        const filteredAnnotations = annotations.filter(a =>
+          a.type === 'signature' || a.type === 'text' || (includeHighlights && a.type === 'highlight')
+        );
+
+        // Embed annotations into a temporary PDF buffer
+        // Note: we embed ALL annotations for the doc, then render the specific page
+        const pageDims = pagesDimensions[pageNumber];
+        const unscaledDimensions = pageDims ? {
+          width: pageDims.width / scale,
+          height: pageDims.height / scale,
+        } : undefined;
+
+        const annotatedPdfBytes = await embedAnnotationsInPdf(
+          file.downloadURL,
+          filteredAnnotations,
+          unscaledDimensions, // Best effort dimensions
+          // We don't strictly need bookmarks for image export, but no harm passing them if we have them
+          []
+        );
+
+        // Load this new PDF data into pdfjs
+        // We have to use a separate Document loading approach here just to render the one page to canvas
+        const loadingTask = pdfjs.getDocument({ data: annotatedPdfBytes });
+        const pdfDoc = await loadingTask.promise;
+        const page = await pdfDoc.getPage(pageNumber);
+
+        // Create an off-screen canvas
+        const viewport = page.getViewport({ scale: 1.5 }); // Higher scale for better quality
+        const canvas = document.createElement('canvas');
+        canvas.width = viewport.width;
+        canvas.height = viewport.height;
+        const ctx = canvas.getContext('2d');
+
+        if (!ctx) throw new Error('Could not get canvas context');
+
+        await page.render({ canvasContext: ctx, viewport }).promise;
+        imageDataUrl = canvas.toDataURL('image/png', 1.0);
+      } else {
+        // Fast path: existing canvas (likely no annotations needing burning or user unselected highlights and no signatures)
+        // However, if we possess signatures/text, we MUST burn them. The check 'shouldBurn' covers this.
+        // So this else block is only for when there are NO annotations at all effectively.
+        const canvas = pageEl.querySelector('canvas');
+        if (!canvas) {
+          toast.error('Page rendering not complete. Please wait a moment.');
+          return;
+        }
+        imageDataUrl = canvas.toDataURL('image/png', 1.0);
+      }
 
       const link = document.createElement('a');
       link.href = imageDataUrl;
@@ -577,9 +632,16 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
         throw new Error('File URL is missing');
       }
 
+      // Filter annotations based on includeHighlights settings
+      // Always keep signature and text. Keep highlight only if checked.
+      const filteredAnnotations = annotations.filter(a =>
+        a.type === 'signature' || a.type === 'text' ||
+        (includeHighlights && a.type === 'highlight')
+      );
+
       const pdfBytes = await embedAnnotationsInPdf(
         file.downloadURL,
-        annotations,
+        filteredAnnotations,
         unscaledDimensions,
         bookmarks
       );
@@ -599,7 +661,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       console.error('Error exporting PDF:', error);
       toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
     }
-  }, [annotations, file, pagesDimensions, scale, bookmarks]);
+  }, [annotations, file, pagesDimensions, scale, bookmarks, includeHighlights]);
 
   // Handle delete key
   useEffect(() => {
@@ -733,16 +795,27 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             </Button>
 
             {showConvertButton && (
-              <Button
-                onClick={handleDownloadImage}
-                disabled={isConverting}
-                variant="outline"
-                className="ml-2"
-              >
-                {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                <ImageIcon className="mr-2 h-4 w-4" />
-                Convert to Image
-              </Button>
+              <div className="flex items-center gap-2 ml-2 border-l pl-2">
+                <div className="flex items-center gap-2 mr-1">
+                  <Checkbox
+                    id="include-highlights-convert"
+                    checked={includeHighlights}
+                    onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
+                  />
+                  <Label htmlFor="include-highlights-convert" className="text-xs font-medium cursor-pointer text-muted-foreground whitespace-nowrap">
+                    Highlights
+                  </Label>
+                </div>
+                <Button
+                  onClick={handleDownloadImage}
+                  disabled={isConverting}
+                  variant="outline"
+                >
+                  {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  <ImageIcon className="mr-2 h-4 w-4" />
+                  Convert to Image
+                </Button>
+              </div>
             )}
           </div>
           {isSearching && (
@@ -751,7 +824,11 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
           {activeMode === 'edit' && (
             <div className="flex justify-center">
-              <EditToolbar onExport={handleExportWithAnnotations} />
+              <EditToolbar
+                onExport={handleExportWithAnnotations}
+                includeHighlights={includeHighlights}
+                setIncludeHighlights={setIncludeHighlights}
+              />
             </div>
           )}
 

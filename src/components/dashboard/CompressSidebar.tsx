@@ -15,6 +15,8 @@ import {
 } from '@/components/ui/select';
 import { formatBytes } from '@/lib/utils';
 import { Download, RefreshCw, ArrowRight } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 
 const COMPRESSOR_API_URL = 'https://pdf-compressor-837865788232.us-central1.run.app/compress';
 
@@ -37,6 +39,7 @@ const CompressSidebar = () => {
   const [compressedResult, setCompressedResult] = useState<CompressedResult | null>(null);
 
   const selectedFile = files.find((f) => f.id === selectedFileId);
+  const [includeHighlights, setIncludeHighlights] = useState(false);
 
   useEffect(() => {
     // Reset result when a new file is selected
@@ -94,7 +97,34 @@ const CompressSidebar = () => {
 
       // Fetch the file from the download URL
       const response = await fetch(selectedFile.downloadURL, { signal: controller.signal });
-      const fileBlob = await response.blob();
+      let fileBlob = await response.blob();
+
+      // Embed annotations if present
+      if (selectedFile.annotations?.length || selectedFile.bookmarks?.length) {
+        try {
+          toast.info('Embedding annotations...', { id: 'compress-embedding' });
+          const arrayBuffer = await fileBlob.arrayBuffer();
+
+          // Filter out highlights if not requested
+          const filteredAnnotations = (selectedFile.annotations || []).filter(a =>
+            a.type === 'signature' || a.type === 'text' ||
+            (includeHighlights && a.type === 'highlight')
+          );
+
+          const annotatedBytes = await embedAnnotationsInPdf(
+            arrayBuffer,
+            filteredAnnotations,
+            undefined,
+            selectedFile.bookmarks
+          );
+
+          fileBlob = new Blob([annotatedBytes as any], { type: 'application/pdf' });
+          toast.success('Annotations embedded', { id: 'compress-embedding' });
+        } catch (embedError) {
+          console.error('Error embedding annotations for compress:', embedError);
+          toast.error('Failed to embed annotations, proceeding with original file.', { id: 'compress-embedding' });
+        }
+      }
 
       const formData = new FormData();
       formData.append('file', fileBlob, selectedFile.name);
@@ -206,6 +236,19 @@ const CompressSidebar = () => {
           </span>
         </div>
       )}
+
+      {/* Include Highlights Option */}
+      <div className="flex items-center space-x-2">
+        <Checkbox
+          id="include-highlights-compress"
+          checked={includeHighlights}
+          onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
+          disabled={isCompressing || !selectedFile}
+        />
+        <Label htmlFor="include-highlights-compress" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
+          Include Highlights
+        </Label>
+      </div>
 
       <div>
         <Label htmlFor="compression-level" className="mb-2">Compression Level</Label>

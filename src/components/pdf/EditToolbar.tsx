@@ -1,12 +1,16 @@
 import React from 'react';
 import { Type, PenTool, Trash2, Download } from 'lucide-react';
 import { useAppStore, AnnotationType } from '@/store/useAppStore';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Label } from '@/components/ui/label';
 
 interface EditToolbarProps {
   onExport: () => void;
+  includeHighlights: boolean;
+  setIncludeHighlights: (include: boolean) => void;
 }
 
-const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
+const EditToolbar: React.FC<EditToolbarProps> = ({ onExport, includeHighlights, setIncludeHighlights }) => {
   const { activeEditTool, setActiveEditTool, annotations, clearAnnotations } = useAppStore();
 
   const tools: { type: AnnotationType; icon: React.ReactNode; label: string }[] = [
@@ -30,6 +34,20 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
             <span className="hidden sm:inline">{tool.label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="flex items-center gap-2 border-r border-gray-200 pr-3">
+        {/* Include Highlights Option */}
+        <div className="flex items-center space-x-2">
+          <Checkbox
+            id="include-highlights-edit"
+            checked={includeHighlights}
+            onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
+          />
+          <Label htmlFor="include-highlights-edit" className="text-sm font-medium leading-none cursor-pointer">
+            Include Highlights
+          </Label>
+        </div>
       </div>
 
       <div className="flex items-center gap-2">

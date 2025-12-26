@@ -125,21 +125,27 @@ export const mergePdfs = async (
 
 /**
  * Embeds annotations (text and signatures) into a PDF document.
- * @param pdfUrl The URL of the PDF to annotate.
+ * @param pdfSource The URL of the PDF or ArrayBuffer to annotate.
  * @param annotations The annotations to embed.
  * @param canvasDimensions The dimensions of the rendered canvas (for coordinate conversion).
  * @param bookmarks Optional list of bookmarks.
  * @returns The bytes of the annotated PDF.
  */
 export const embedAnnotationsInPdf = async (
-  pdfUrl: string,
+  pdfSource: string | ArrayBuffer,
   annotations: Annotation[],
-  canvasDimensions: { width: number; height: number },
+  canvasDimensions?: { width: number; height: number },
   bookmarks?: Bookmark[]
 ): Promise<Uint8Array> => {
-  // Fetch the original PDF
-  const response = await fetch(pdfUrl);
-  const arrayBuffer = await response.arrayBuffer();
+  let arrayBuffer: ArrayBuffer;
+
+  if (typeof pdfSource === 'string') {
+    const response = await fetch(pdfSource);
+    arrayBuffer = await response.arrayBuffer();
+  } else {
+    arrayBuffer = pdfSource;
+  }
+
   const pdfDoc = await PDFDocument.load(arrayBuffer);
 
   // Embed the font for text annotations
@@ -163,6 +169,9 @@ export const embedAnnotationsInPdf = async (
     const page = pdfDoc.getPage(pageIndex);
     const { width: pageWidth, height: pageHeight } = page.getSize();
 
+    // Default to page size if no canvas dimensions provided (fallback)
+    const currentCanvasDimensions = canvasDimensions || { width: pageWidth, height: pageHeight };
+
     // Convert relative coordinates (0-1) to PDF coordinates
     // Note: PDF coordinates start from bottom-left, canvas from top-left
     const pdfX = annotation.position.x * pageWidth;
@@ -175,7 +184,7 @@ export const embedAnnotationsInPdf = async (
       const color = hexToRgb(fontColor);
 
       // Scale font size based on canvas to PDF ratio
-      const scaleFactor = pageHeight / canvasDimensions.height;
+      const scaleFactor = pageHeight / currentCanvasDimensions.height;
       const scaledFontSize = fontSize * scaleFactor;
 
       // Account for text box padding (px-2 = 8px, py-1 = 4px in Tailwind)
@@ -198,8 +207,8 @@ export const embedAnnotationsInPdf = async (
       const storedHeight = annotation.style?.height || 0;
 
       // Detect if values are legacy absolute pixels (> 1) or new relative (0-1)
-      const relativeWidth = storedWidth > 1 ? storedWidth / canvasDimensions.width : storedWidth;
-      const relativeHeight = storedHeight > 1 ? storedHeight / canvasDimensions.height : storedHeight;
+      const relativeWidth = storedWidth > 1 ? storedWidth / currentCanvasDimensions.width : storedWidth;
+      const relativeHeight = storedHeight > 1 ? storedHeight / currentCanvasDimensions.height : storedHeight;
 
       // Convert relative dimensions to PDF dimensions
       const scaledWidth = relativeWidth * pageWidth;
@@ -215,7 +224,7 @@ export const embedAnnotationsInPdf = async (
 
         // Draw the signature image
         // Small offset adjustment to align with visual position
-        const scaleFactor = pageHeight / canvasDimensions.height;
+        const scaleFactor = pageHeight / currentCanvasDimensions.height;
         const offsetX = 2 * scaleFactor;
 
         page.drawImage(image, {
