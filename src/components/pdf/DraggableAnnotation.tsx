@@ -57,7 +57,9 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
   const bindDrag = useDrag(
     ({ movement: [mx, my], first, last, memo }) => {
       if (first) {
-        onSelect();
+        if (!isSelected) {
+          onSelect();
+        }
         return {
           initialPos: position,
         };
@@ -180,7 +182,7 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
       }}
       onClick={(e) => {
         e.stopPropagation();
-        onSelect();
+        // Selection is handled by drag handler (on pointer down)
       }}
     >
       <div className={`relative ${isSelected ? 'ring-1 ring-blue-500 ring-offset-2' : ''}`}>

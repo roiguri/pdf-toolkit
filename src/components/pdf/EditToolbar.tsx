@@ -14,15 +14,15 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
   ];
 
   return (
-    <div className="flex items-center gap-2 p-2 bg-gray-100 rounded-lg">
-      <div className="flex items-center gap-1 border-r border-gray-300 pr-2">
+    <div className="flex items-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg">
+      <div className="flex items-center gap-1 border-r border-gray-200 pr-3">
         {tools.map((tool) => (
           <button
             key={tool.type}
-            onClick={() => setActiveEditTool(tool.type)}
-            className={`flex items-center gap-1 px-3 py-1.5 rounded-md text-sm transition-colors ${activeEditTool === tool.type
-              ? 'bg-blue-600 text-white'
-              : 'bg-white text-gray-700 hover:bg-gray-200'
+            onClick={() => setActiveEditTool(activeEditTool === tool.type ? null : tool.type)}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 active:scale-95 ${activeEditTool === tool.type
+              ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-600 ring-offset-2'
+              : 'bg-gray-50 text-gray-700 hover:bg-gray-100 hover:text-blue-600 border border-transparent hover:border-gray-200'
               }`}
             title={tool.label}
           >
@@ -32,21 +32,21 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport }) => {
         ))}
       </div>
 
-      <div className="flex items-center gap-1">
-        {annotations.length > 0 && (
+      <div className="flex items-center gap-2">
+        {annotations.some(a => a.type === 'signature') && (
           <button
-            onClick={clearAnnotations}
-            className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm bg-white text-red-600 hover:bg-red-50 transition-colors"
-            title="Clear all annotations"
+            onClick={() => clearAnnotations('signature')}
+            className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-white text-red-600 border border-red-100 hover:bg-red-50 hover:border-red-200 shadow-sm hover:shadow transition-all duration-200 active:scale-95"
+            title="Clear all signatures"
           >
             <Trash2 size={16} />
-            <span className="hidden sm:inline">Clear All</span>
+            <span className="hidden sm:inline">Clear Signatures</span>
           </button>
         )}
 
         <button
           onClick={onExport}
-          className="flex items-center gap-1 px-3 py-1.5 rounded-md text-sm bg-green-600 text-white hover:bg-green-700 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium bg-green-600 text-white shadow-sm hover:bg-green-700 hover:shadow-md hover:ring-2 hover:ring-green-600 hover:ring-offset-2 transition-all duration-200 active:scale-95"
           title="Export PDF with annotations"
         >
           <Download size={16} />

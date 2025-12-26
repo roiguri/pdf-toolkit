@@ -71,6 +71,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
         pointerEvents: activeMode === 'edit' ? 'auto' : 'none',
         width: canvasWidth,
         height: canvasHeight,
+        zIndex: 50,
       }}
       onClick={handleOverlayClick}
     >
@@ -79,12 +80,12 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
         if (canvasWidth <= 0 || canvasHeight <= 0) return null;
 
         if (annotation.type === 'signature') {
-           // Validate annotation position is within bounds
-            if (annotation.position.x < 0 || annotation.position.x > 1 ||
+          // Validate annotation position is within bounds
+          if (annotation.position.x < 0 || annotation.position.x > 1 ||
             annotation.position.y < 0 || annotation.position.y > 1) {
             console.warn(`Annotation ${annotation.id} has invalid position:`, annotation.position);
             return null;
-            }
+          }
 
           return (
             <SignatureAnnotation

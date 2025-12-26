@@ -14,7 +14,7 @@ interface AppState {
   // Annotation state
   annotations: Annotation[];
   bookmarks: Bookmark[];
-  activeEditTool: AnnotationType;
+  activeEditTool: AnnotationType | null;
   selectedAnnotationId: string | null;
   selectedBookmarkId: string | null;
   // Compression state
@@ -33,12 +33,12 @@ interface AppState {
   reorderMergeSelection: (startIndex: number, endIndex: number) => void;
   clearMergeSelection: () => void;
   // Annotation actions
-  setActiveEditTool: (tool: AnnotationType) => void;
+  setActiveEditTool: (tool: AnnotationType | null) => void;
   addAnnotation: (annotation: Annotation) => void;
   updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
   deleteAnnotation: (id: string) => void;
   setSelectedAnnotationId: (id: string | null) => void;
-  clearAnnotations: () => void;
+  clearAnnotations: (type?: AnnotationType) => void;
   setAnnotations: (annotations: Annotation[]) => void;
   // Bookmark actions
   addBookmark: (pageNumber: number) => void;
@@ -61,7 +61,7 @@ const initialState = {
   mergeSelection: [],
   annotations: [] as Annotation[],
   bookmarks: [] as Bookmark[],
-  activeEditTool: 'signature' as AnnotationType,
+  activeEditTool: null,
   selectedAnnotationId: null,
   selectedBookmarkId: null,
   isCompressing: false,
@@ -86,11 +86,13 @@ export const useAppStore = create<AppState>((set, get) => ({
   setFiles: (files) => {
     // When files list updates (e.g. from firestore subscription), update annotations/bookmarks for current file
     set((state) => {
-      const currentFile = files.find((f) => f.id === state.selectedFileId);
+      // We update the files list, but we DO NOT overwrite the currently active 'annotations'
+      // or 'bookmarks' with the data from 'files'.
+      // The local state (state.annotations) is the source of truth while the user is editing.
+      // Overwriting it with server data (which might be slightly stale or just echoing back)
+      // causes race conditions where local changes are lost/reverted.
       return {
         files,
-        annotations: currentFile?.annotations || state.annotations,
-        bookmarks: currentFile?.bookmarks || state.bookmarks,
       };
     });
   },
@@ -131,7 +133,13 @@ export const useAppStore = create<AppState>((set, get) => ({
       }
       return { selectedAnnotationId: id, selectedBookmarkId: null };
     }),
-  clearAnnotations: () => set({ annotations: [], selectedAnnotationId: null }),
+  clearAnnotations: (type?: AnnotationType) =>
+    set((state) => ({
+      annotations: type
+        ? state.annotations.filter((a) => a.type !== type)
+        : [],
+      selectedAnnotationId: null,
+    })),
   setAnnotations: (annotations) => set({ annotations }),
 
   // Bookmark actions
