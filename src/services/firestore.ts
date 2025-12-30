@@ -23,6 +23,7 @@ export interface Annotation {
   pageNumber: number;
   type: AnnotationType;
   position: { x: number; y: number }; // Relative coordinates (0-1)
+  rotation?: number; // Degrees
   content: string; // Text content, base64 signature image, or highlight text
   rects?: { x: number; y: number; width: number; height: number }[]; // For highlights: relative coordinates
   style?: {

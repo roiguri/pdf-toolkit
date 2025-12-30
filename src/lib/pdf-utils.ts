@@ -1,5 +1,5 @@
 // src/lib/pdf-utils.ts
-import { PDFDocument, StandardFonts, rgb, PDFName, PDFDict, PDFRef } from 'pdf-lib';
+import { PDFDocument, StandardFonts, rgb, PDFName, PDFDict, PDFRef, degrees } from 'pdf-lib';
 import { Annotation, Bookmark } from '@/services/firestore';
 
 /**
@@ -200,6 +200,7 @@ export const embedAnnotationsInPdf = async (
         size: scaledFontSize,
         font,
         color: rgb(color.r, color.g, color.b),
+        rotate: degrees(-(annotation.rotation || 0)),
       });
     } else if (annotation.type === 'signature') {
       // Get signature dimensions (relative coordinates)
@@ -232,6 +233,7 @@ export const embedAnnotationsInPdf = async (
           y: pdfY - scaledHeight, // Adjust for image positioning
           width: scaledWidth,
           height: scaledHeight,
+          rotate: degrees(-(annotation.rotation || 0)),
         });
       } catch (error) {
         console.error('Error embedding signature:', error);

@@ -3,13 +3,14 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { Page } from 'react-pdf';
 import { Loader2 } from 'lucide-react';
-import AnnotationOverlay from './AnnotationOverlay';
+import { FabricLayer } from './FabricLayer';
 import TextSelectionMenu from './TextSelectionMenu';
 import { useAppStore } from '@/store/useAppStore';
 
 interface PDFPageProps {
   pageNumber: number;
   scale: number;
+  resolutionScale: number; // Added: Scale for quality (render scale)
   containerWidth?: number;
   shouldRender: boolean;
   onAddAnnotation: (position: { x: number; y: number }) => void;
@@ -34,6 +35,7 @@ interface HighlightRect {
 export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   pageNumber,
   scale,
+  resolutionScale,
   containerWidth,
   shouldRender,
   onAddAnnotation,
@@ -50,7 +52,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
 
   const pageContentRef = useRef<HTMLDivElement>(null);
   const textLayerRendered = useRef(false);
-  const { addAnnotation, activeMode } = useAppStore();
+  const { addAnnotation, updateAnnotation, setSelectedAnnotationId } = useAppStore();
 
   // Function to calculate highlights without modifying DOM
   const calculateHighlights = useCallback(() => {
@@ -317,19 +319,59 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     setSelectionMenuPosition(null);
   };
 
+  // High DPI rendering logic
+  // If resolutionScale > 1, we want to render the Page at (scale * resolutionScale)
+  // But constrain the visual size to (scale * originalWidth)
+
+  // The calculated width passed to Page
+  const renderWidth = containerWidth ? containerWidth * scale * resolutionScale : undefined;
+
+  // The forced CSS width for the container to maintain layout size
+  const cssWidth = containerWidth ? containerWidth * scale : undefined;
+
+  // We need to inject styles to force the canvas and text layer to fit the cssWidth
+  // This is a bit tricky with react-pdf as it injects its own styles.
+  // We will use a style block or specific class logic.
+
   return (
     <div
       ref={ref}
+      id={`pdf-page-${pageNumber}`} // Add ID for scrolling
       data-page-number={pageNumber}
-      className="relative mb-4 flex justify-center"
-      style={{ minHeight: '300px' }} // Minimum height to prevent total collapse
+      className="relative mb-4 flex justify-center pdf-page-container"
+      style={{
+          minHeight: '300px',
+          width: cssWidth ? `${cssWidth}px` : 'auto' // Constrain layout width
+      }}
     >
-      <div ref={pageContentRef} className="relative">
+      <div
+        ref={pageContentRef}
+        className="relative"
+        style={{
+            width: '100%',
+            height: '100%'
+        }}
+      >
+        <style jsx global>{`
+          /* Force canvas to fit container */
+          .pdf-page-container .react-pdf__Page__canvas {
+            width: 100% !important;
+            height: 100% !important;
+          }
+          /* Scale text layer back down */
+          .pdf-page-container .react-pdf__Page__textContent {
+            transform: scale(${1 / resolutionScale});
+            transform-origin: 0 0;
+            width: ${100 * resolutionScale}% !important;
+            height: ${100 * resolutionScale}% !important;
+          }
+        `}</style>
+
         {useMemo(() => (
           shouldRender ? (
             <Page
               pageNumber={pageNumber}
-              width={containerWidth ? containerWidth * scale : undefined}
+              width={renderWidth} // Render at high res
               loading={PageLoading}
               renderTextLayer={true}
               renderAnnotationLayer={false}
@@ -341,14 +383,14 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             <div
               className="bg-white shadow-md flex items-center justify-center text-muted-foreground"
               style={{
-                width: containerWidth ? containerWidth * scale : '100%',
+                width: '100%',
                 height: canvasDimensions.height || defaultHeight || 800
               }}
             >
               <span className="text-sm">Page {pageNumber}</span>
             </div>
           )
-        ), [shouldRender, pageNumber, containerWidth, scale, onRenderTextLayerSuccess, canvasDimensions.height, defaultHeight])}
+        ), [shouldRender, pageNumber, renderWidth, onRenderTextLayerSuccess, canvasDimensions.height, defaultHeight, resolutionScale])}
 
         {/* Highlight Overlay Layer (Search Results) */}
         <div className="absolute inset-0 pointer-events-none z-10">
@@ -378,12 +420,14 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
         </div>
 
         {shouldRender && canvasDimensions.width > 0 && (
-          <AnnotationOverlay
+          <FabricLayer
             pageNumber={pageNumber}
-            canvasWidth={canvasDimensions.width}
-            canvasHeight={canvasDimensions.height}
-            scale={scale}
-            onAddAnnotation={onAddAnnotation}
+            width={canvasDimensions.width}
+            height={canvasDimensions.height}
+            resolutionScale={resolutionScale}
+            onCanvasClick={onAddAnnotation}
+            onUpdateAnnotation={updateAnnotation}
+            onSelectAnnotation={setSelectedAnnotationId}
           />
         )}
 
