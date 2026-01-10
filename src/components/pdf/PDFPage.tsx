@@ -321,10 +321,10 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     <div
       ref={ref}
       data-page-number={pageNumber}
-      className="relative mb-4 flex justify-center"
+      className="relative mb-4 flex"
       style={{ minHeight: '300px' }} // Minimum height to prevent total collapse
     >
-      <div ref={pageContentRef} className="relative">
+      <div ref={pageContentRef} className="relative w-fit mx-auto">
         {useMemo(() => (
           shouldRender ? (
             <Page
