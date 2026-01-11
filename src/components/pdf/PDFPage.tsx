@@ -174,6 +174,16 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
     calculateHighlightsRef.current?.();
   }, []);
 
+  // Handle text layer errors - suppress the harmless AbortException that occurs
+  // when pages unmount or change rapidly during text layer rendering
+  const onRenderTextLayerError = useCallback((error: Error) => {
+    if (error.name === 'AbortException') {
+      // This is expected when navigating away before text layer finishes rendering
+      return;
+    }
+    console.error('Text layer rendering error:', error);
+  }, []);
+
   // Use a ref to access latest calculateHighlights without changing callback dependency
   const calculateHighlightsRef = useRef(calculateHighlights);
   useEffect(() => {
@@ -256,10 +266,10 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
 
       // Check if selection is inside this page
       if (!pageContentRef.current.contains(range.commonAncestorContainer)) {
-         // It might be selection crossing pages, which is complex.
-         // We'll ignore cross-page selections or selections not starting in this page for now.
-         // Or if this page is not part of the selection, do nothing.
-         return;
+        // It might be selection crossing pages, which is complex.
+        // We'll ignore cross-page selections or selections not starting in this page for now.
+        // Or if this page is not part of the selection, do nothing.
+        return;
       }
 
       // Calculate position for the menu (at the end of selection)
@@ -334,6 +344,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
               renderTextLayer={true}
               renderAnnotationLayer={false}
               onRenderTextLayerSuccess={onRenderTextLayerSuccess}
+              onRenderTextLayerError={onRenderTextLayerError}
               canvasBackground="white"
               className="shadow-md"
             />
@@ -348,7 +359,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
               <span className="text-sm">Page {pageNumber}</span>
             </div>
           )
-        ), [shouldRender, pageNumber, containerWidth, scale, onRenderTextLayerSuccess, canvasDimensions.height, defaultHeight])}
+        ), [shouldRender, pageNumber, containerWidth, scale, onRenderTextLayerSuccess, onRenderTextLayerError, canvasDimensions.height, defaultHeight])}
 
         {/* Highlight Overlay Layer (Search Results) */}
         <div className="absolute inset-0 pointer-events-none z-10">
