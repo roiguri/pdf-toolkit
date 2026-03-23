@@ -10,7 +10,18 @@ import { Loader2 } from 'lucide-react';
 import { FileMetadata } from '@/services/firestore';
 import { PDFViewer } from '@/components/pdf/PDFViewer';
 import { useAppStore } from '@/store/useAppStore';
-import { splitPdf, downloadPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
+import { splitPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
+
+const downloadPdf = (bytes: Uint8Array, filename: string) => {
+  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+};
 
 interface SplitToolProps {
   file: FileMetadata;

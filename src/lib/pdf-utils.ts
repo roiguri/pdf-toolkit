@@ -3,23 +3,6 @@ import { PDFDocument, StandardFonts, rgb, PDFName, PDFDict, PDFRef } from 'pdf-l
 import { Annotation, Bookmark } from '@/services/firestore';
 
 /**
- * Downloads a file to the user's browser.
- * @param bytes The PDF bytes to download.
- * @param filename The name of the file.
- * @param mimeType The MIME type of the file.
- */
-export const downloadPdf = (bytes: Uint8Array, filename: string) => {
-  const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(link.href); // Clean up the URL object
-};
-
-/**
  * Loads a PDF document from an ArrayBuffer.
  * @param arrayBuffer The ArrayBuffer containing the PDF data.
  * @returns A PDFDocument object.
