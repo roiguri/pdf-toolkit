@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const arrayBuffers = await Promise.all(pdfFiles.map((f) => f.arrayBuffer()));
     const { bytes, filename } = await mergePdfs(arrayBuffers, 'merged.pdf');
 
-    return new Response(bytes, {
+    return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,

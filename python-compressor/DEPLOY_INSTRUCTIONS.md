@@ -19,21 +19,21 @@ Follow these steps to deploy the PDF compression service to Google Cloud Run.
     gcloud auth configure-docker us-central1-docker.pkg.dev
     ```
 
-2.  **Build the Docker Image:** Navigate to the `python-compressor` directory and build the Docker image. Replace `[PROJECT_ID]` with your Google Cloud project ID.
+2.  **Build the Docker Image:** Navigate to the `python-compressor` directory and build the Docker image. Replace `pdf-tools-e8e51` with your Google Cloud project ID.
     ```bash
     cd python-compressor
-    docker build -t us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor .
+    docker build -t us-central1-docker.pkg.dev/pdf-tools-e8e51/pdf-tools-repo/pdf-compressor .
     ```
 
 3.  **Push the Image to Artifact Registry:** Push the image to the Google Artifact Registry.
     ```bash
-    docker push us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor
+    docker push us-central1-docker.pkg.dev/pdf-tools-e8e51/pdf-tools-repo/pdf-compressor
     ```
 
-4.  **Deploy to Cloud Run:** Deploy the container image to Cloud Run. Replace `[PROJECT_ID]` with your project ID and `[REGION]` with your desired region (e.g., `us-central1`).
+4.  **Deploy to Cloud Run:** Deploy the container image to Cloud Run. Replace `pdf-tools-e8e51` with your project ID and `[REGION]` with your desired region (e.g., `us-central1`).
     ```bash
     gcloud run deploy pdf-compressor \
-      --image us-central1-docker.pkg.dev/[PROJECT_ID]/pdf-tools-repo/pdf-compressor \
+      --image us-central1-docker.pkg.dev/pdf-tools-e8e51/pdf-tools-repo/pdf-compressor \
       --platform managed \
       --region [REGION] \
       --allow-unauthenticated
@@ -42,6 +42,6 @@ Follow these steps to deploy the PDF compression service to Google Cloud Run.
 
 5.  **Get the Service URL:** After deployment, the command will output the URL of your service. It will look something like this:
     `https://pdf-compressor-xxxxxxxxxx-uc.a.run.app`
-    Your deployed service URL is: `https://pdf-compressor-837865788232.us-central1.run.app`
+    Your deployed service URL is: `https://pdf-compressor-621306512794.us-central1.run.app`
 
     You will need this URL for the frontend integration.

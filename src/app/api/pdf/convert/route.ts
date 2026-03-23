@@ -1,8 +1,6 @@
 import { NextRequest } from 'next/server';
 
-const COMPRESS_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/compress';
-const VALID_LEVELS = ['screen', 'ebook', 'prepress'] as const;
-type CompressionLevel = typeof VALID_LEVELS[number];
+const RENDER_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/render';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.PDF_API_KEY;
@@ -18,36 +16,34 @@ export async function POST(req: NextRequest) {
   }
 
   const file = form.get('file');
-  const level = (form.get('level') as string) ?? 'ebook';
+  const pageRaw = form.get('page') ?? '1';
+  const page = parseInt(String(pageRaw), 10);
 
   if (!(file instanceof File)) {
     return Response.json({ error: 'Missing field: file (PDF)' }, { status: 400 });
   }
-  if (!VALID_LEVELS.includes(level as CompressionLevel)) {
-    return Response.json(
-      { error: `Invalid level. Must be one of: ${VALID_LEVELS.join(', ')}` },
-      { status: 400 }
-    );
+  if (isNaN(page) || page < 1) {
+    return Response.json({ error: 'Invalid field: page must be a positive integer' }, { status: 400 });
   }
 
   try {
     const upstream = new FormData();
     upstream.append('file', file);
-    upstream.append('quality', level);
+    upstream.append('page', String(page));
 
-    const response = await fetch(COMPRESS_API_URL, { method: 'POST', body: upstream });
+    const response = await fetch(RENDER_API_URL, { method: 'POST', body: upstream });
 
     if (!response.ok) {
       const text = await response.text();
-      return Response.json({ error: `Compression service error: ${text}` }, { status: 502 });
+      return Response.json({ error: `Render service error: ${text}` }, { status: 502 });
     }
 
-    const compressed = await response.arrayBuffer();
-    const outName = file.name.replace(/\.pdf$/i, `_compressed_${level}.pdf`);
+    const imageBuffer = await response.arrayBuffer();
+    const outName = file.name.replace(/\.pdf$/i, `_page${page}.png`);
 
-    return new Response(compressed, {
+    return new Response(imageBuffer, {
       headers: {
-        'Content-Type': 'application/pdf',
+        'Content-Type': 'image/png',
         'Content-Disposition': `attachment; filename="${outName}"`,
       },
     });

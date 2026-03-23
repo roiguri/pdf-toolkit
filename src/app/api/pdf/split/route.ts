@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { bytes, filename } = results[0];
-    return new Response(bytes, {
+    return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
         'Content-Disposition': `attachment; filename="${filename}"`,

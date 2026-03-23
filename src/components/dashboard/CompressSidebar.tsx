@@ -18,7 +18,7 @@ import { Download, RefreshCw, ArrowRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 
-const COMPRESSOR_API_URL = 'https://pdf-compressor-837865788232.us-central1.run.app/compress';
+const COMPRESSOR_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/compress';
 
 interface CompressedResult {
   url: string;

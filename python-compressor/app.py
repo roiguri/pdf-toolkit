@@ -47,5 +47,48 @@ def compress_pdf():
         if os.path.exists(output_path):
             os.remove(output_path)
 
+@app.route('/render', methods=['POST'])
+def render_pdf_page():
+    if 'file' not in request.files:
+        return 'No file part', 400
+    file = request.files['file']
+    if file.filename == '':
+        return 'No selected file', 400
+
+    try:
+        page = int(request.form.get('page', 1))
+    except ValueError:
+        return 'Invalid page number', 400
+
+    filename = str(uuid.uuid4())
+    input_path = os.path.join('/tmp', f'{filename}.pdf')
+    output_path = os.path.join('/tmp', f'{filename}_page.png')
+    file.save(input_path)
+
+    gs_command = [
+        'gs',
+        '-dBATCH',
+        '-dNOPAUSE',
+        '-dQUIET',
+        '-sDEVICE=png16m',
+        '-r150',
+        f'-dFirstPage={page}',
+        f'-dLastPage={page}',
+        f'-sOutputFile={output_path}',
+        input_path
+    ]
+
+    try:
+        subprocess.run(gs_command, check=True)
+        return send_file(output_path, mimetype='image/png', download_name='page.png')
+    except subprocess.CalledProcessError as e:
+        return f'Error rendering PDF: {e}', 500
+    finally:
+        if os.path.exists(input_path):
+            os.remove(input_path)
+        if os.path.exists(output_path):
+            os.remove(output_path)
+
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=int(os.environ.get('PORT', 8080)))
