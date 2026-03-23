@@ -120,7 +120,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
         </Button>
       </div>
 
-      <PDFViewer ref={viewerRef} file={file} />
+      <PDFViewer ref={viewerRef} file={file} annotations={annotations} bookmarks={[]} />
     </>
   );
 };

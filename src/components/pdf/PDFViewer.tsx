@@ -26,7 +26,7 @@ import {
 import { toast } from 'sonner';
 import { FileMetadata } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
-import { useAppStore } from '@/store/useAppStore';
+import { Annotation, Bookmark, AnnotationType } from '@/store/useAppStore';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
 import AnnotationsSidebar from './AnnotationsSidebar';
@@ -43,15 +43,14 @@ export interface PDFViewerHandle {
 
 interface PDFViewerProps {
   file: FileMetadata;
-  // New optional props — when provided, take precedence over store values
-  annotations?: import('@/store/useAppStore').Annotation[];
+  annotations?: Annotation[];
   selectedAnnotationId?: string | null;
-  bookmarks?: import('@/store/useAppStore').Bookmark[];
+  bookmarks?: Bookmark[];
   selectedBookmarkId?: string | null;
   isEditMode?: boolean;
-  activeEditTool?: import('@/store/useAppStore').AnnotationType | null;
-  onAnnotationAdd?: (annotation: import('@/store/useAppStore').Annotation) => void;
-  onAnnotationUpdate?: (id: string, updates: Partial<import('@/store/useAppStore').Annotation>) => void;
+  activeEditTool?: AnnotationType | null;
+  onAnnotationAdd?: (annotation: Annotation) => void;
+  onAnnotationUpdate?: (id: string, updates: Partial<Annotation>) => void;
   onAnnotationDelete?: (id: string) => void;
   onAnnotationSelect?: (id: string | null) => void;
   onBookmarkToggle?: (pageNumber: number) => void;
@@ -87,8 +86,8 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   onAnnotationUpdate: onAnnotationUpdateProp,
   onAnnotationDelete: onAnnotationDeleteProp,
   onAnnotationSelect: onAnnotationSelectProp,
-  onBookmarkToggle: _onBookmarkToggle,
-  onBookmarkSelect: _onBookmarkSelect,
+  onBookmarkToggle: onBookmarkToggleProp,
+  onBookmarkSelect: onBookmarkSelectProp,
   onSignaturePlacementRequest: onSignaturePlacementRequestProp,
 }: PDFViewerProps, ref) {
   const [numPages, setNumPages] = useState<number | null>(null);
@@ -126,34 +125,26 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
     get pagesDimensions() { return pagesDimensions; },
   }), [pageNumber, scale, pagesDimensions]);
 
-  const {
-    activeMode,
-    activeEditTool,
-    addAnnotation,
-    annotations,
-    setSelectedAnnotationId,
-    selectedAnnotationId,
-    deleteAnnotation,
-    updateAnnotation,
-    bookmarks,
-    toggleBookmark,
-    setSelectedBookmarkId
-  } = useAppStore();
+  // Effective values — all data and callbacks come from props; empty/no-op defaults for optional usage.
+  const effectiveAnnotations = annotationsProp ?? [];
+  const effectiveSelectedAnnotationId = selectedAnnotationIdProp ?? null;
+  const effectiveIsEditMode = isEditModeProp ?? false;
+  const effectiveActiveEditTool = activeEditToolProp ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationAdd = onAnnotationAddProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationUpdate = onAnnotationUpdateProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationDelete = onAnnotationDeleteProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationSelect = onAnnotationSelectProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnBookmarkToggle = onBookmarkToggleProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnBookmarkSelect = onBookmarkSelectProp ?? (() => {});
 
-  // Effective values — props take precedence over store values.
-  // This allows tool components to supply their own data/callbacks while
-  // keeping the store as fallback so existing usage works unchanged.
-  const effectiveAnnotations = annotationsProp ?? annotations;
-  const effectiveSelectedAnnotationId = selectedAnnotationIdProp !== undefined ? selectedAnnotationIdProp : selectedAnnotationId;
-  const effectiveIsEditMode = isEditModeProp ?? (activeMode === 'edit');
-  const effectiveActiveEditTool = activeEditToolProp ?? activeEditTool;
-  const effectiveOnAnnotationAdd = onAnnotationAddProp ?? addAnnotation;
-  const effectiveOnAnnotationUpdate = onAnnotationUpdateProp ?? updateAnnotation;
-  const effectiveOnAnnotationDelete = onAnnotationDeleteProp ?? deleteAnnotation;
-  const effectiveOnAnnotationSelect = onAnnotationSelectProp ?? setSelectedAnnotationId;
-
-  const effectiveBookmarks = bookmarksProp ?? bookmarks;
-  const isBookmarked = effectiveBookmarks.some(b => b.pageNumber === pageNumber);
+  const effectiveBookmarks = bookmarksProp ?? [];
+  const isBookmarked = effectiveBookmarks.some((b: Bookmark) => b.pageNumber === pageNumber);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -502,7 +493,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
     // If the click target is the container itself or a direct padding area, not a page
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('react-pdf__Document')) {
       effectiveOnAnnotationSelect(null);
-      setSelectedBookmarkId(null);
+      effectiveOnBookmarkSelect(null);
     }
   };
 
@@ -585,7 +576,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </div>
 
             <Button
-              onClick={() => toggleBookmark(pageNumber)}
+              onClick={() => effectiveOnBookmarkToggle(pageNumber)}
               variant={isBookmarked ? "default" : "outline"}
               size="icon"
               title={isBookmarked ? "Remove bookmark" : "Bookmark this page"}
@@ -711,7 +702,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
                             : null
                         }
                         isEditMode={effectiveIsEditMode}
-                        annotations={effectiveAnnotations.filter(a => a.pageNumber === pageNum)}
+                        annotations={effectiveAnnotations.filter((a: Annotation) => a.pageNumber === pageNum)}
                         selectedAnnotationId={effectiveSelectedAnnotationId}
                         onAnnotationUpdate={effectiveOnAnnotationUpdate}
                         onAnnotationDelete={effectiveOnAnnotationDelete}

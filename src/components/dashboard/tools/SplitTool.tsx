@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Loader2 } from 'lucide-react';
 import { FileMetadata } from '@/services/firestore';
 import { PDFViewer } from '@/components/pdf/PDFViewer';
+import { useAppStore } from '@/store/useAppStore';
 import { splitPdf, downloadPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
 
 interface SplitToolProps {
@@ -16,6 +17,7 @@ interface SplitToolProps {
 }
 
 const SplitTool = ({ file }: SplitToolProps) => {
+  const { annotations } = useAppStore();
   const [splitPageRanges, setSplitPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [includeHighlights, setIncludeHighlights] = useState(false);
@@ -96,7 +98,7 @@ const SplitTool = ({ file }: SplitToolProps) => {
           Split PDF
         </Button>
       </div>
-      <PDFViewer file={file} />
+      <PDFViewer file={file} annotations={annotations} />
     </div>
   );
 };
