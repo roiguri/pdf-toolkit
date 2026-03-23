@@ -1,7 +1,7 @@
 // src/components/pdf/PDFViewer.tsx
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -42,9 +42,30 @@ import AnnotationsSidebar from './AnnotationsSidebar';
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+export interface PDFViewerHandle {
+  getPageElement: (pageNumber: number) => HTMLDivElement | null;
+  currentPage: number;
+  scale: number;
+  pagesDimensions: Record<number, { width: number; height: number }>;
+}
+
 interface PDFViewerProps {
   file: FileMetadata;
   showConvertButton?: boolean;
+  // New optional props — when provided, take precedence over store values
+  annotations?: import('@/store/useAppStore').Annotation[];
+  selectedAnnotationId?: string | null;
+  bookmarks?: import('@/store/useAppStore').Bookmark[];
+  selectedBookmarkId?: string | null;
+  isEditMode?: boolean;
+  activeEditTool?: import('@/store/useAppStore').AnnotationType | null;
+  onAnnotationAdd?: (annotation: import('@/store/useAppStore').Annotation) => void;
+  onAnnotationUpdate?: (id: string, updates: Partial<import('@/store/useAppStore').Annotation>) => void;
+  onAnnotationDelete?: (id: string) => void;
+  onAnnotationSelect?: (id: string | null) => void;
+  onBookmarkToggle?: (pageNumber: number) => void;
+  onBookmarkSelect?: (id: string | null) => void;
+  toolbarSlot?: React.ReactNode;
 }
 
 // Zoom constants
@@ -61,7 +82,24 @@ const DocumentLoading = (
 const DocumentNoData = <p>No PDF file selected or available.</p>;
 const DocumentError = <p>Failed to load PDF. Check CORS settings or file availability.</p>;
 
-export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
+export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PDFViewer({
+  file,
+  showConvertButton = true,
+  toolbarSlot,
+  // New props — wired in Phase 3/4/5; declared here so callers can pass them
+  annotations: _annotationsProp,
+  selectedAnnotationId: _selectedAnnotationIdProp,
+  bookmarks: _bookmarksProp,
+  selectedBookmarkId: _selectedBookmarkIdProp,
+  isEditMode: _isEditModeProp,
+  activeEditTool: _activeEditToolProp,
+  onAnnotationAdd: _onAnnotationAdd,
+  onAnnotationUpdate: _onAnnotationUpdate,
+  onAnnotationDelete: _onAnnotationDelete,
+  onAnnotationSelect: _onAnnotationSelect,
+  onBookmarkToggle: _onBookmarkToggle,
+  onBookmarkSelect: _onBookmarkSelect,
+}: PDFViewerProps, ref) {
   // Persistence hook
   usePdfPersistence();
 
@@ -96,6 +134,14 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const pdfContentRef = useRef<HTMLDivElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
   const { currentUser } = useAuth();
+
+  // Expose imperative handle for tools (e.g. ConvertTool needs canvas access)
+  useImperativeHandle(ref, () => ({
+    getPageElement: (page: number) => pageRefs.current.get(page) ?? null,
+    get currentPage() { return pageNumber; },
+    get scale() { return scale; },
+    get pagesDimensions() { return pagesDimensions; },
+  }), [pageNumber, scale, pagesDimensions]);
 
   const {
     activeMode,
@@ -822,13 +868,18 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse" />
           )}
 
-          {activeMode === 'edit' && (
+          {activeMode === 'edit' && !toolbarSlot && (
             <div className="flex justify-center">
               <EditToolbar
                 onExport={handleExportWithAnnotations}
                 includeHighlights={includeHighlights}
                 setIncludeHighlights={setIncludeHighlights}
               />
+            </div>
+          )}
+          {toolbarSlot && (
+            <div className="flex justify-center">
+              {toolbarSlot}
             </div>
           )}
 
@@ -943,4 +994,4 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
       />
     </div>
   );
-};
+});
