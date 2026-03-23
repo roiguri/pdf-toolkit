@@ -1,138 +1,20 @@
 // src/components/dashboard/Workspace.tsx
 'use client';
 
-import { useState } from 'react';
 import { useAppStore } from '@/store/useAppStore';
-import { FileMetadata } from '@/services/firestore';
 import ActionToolbar from './ActionToolbar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PDFViewer } from '@/components/pdf/PDFViewer';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { splitPdf, mergePdfs, downloadPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
-import { Label } from '@/components/ui/label';
-import MergeOrderList from './MergeOrderList';
 import CompressSidebar from './CompressSidebar';
 import EditTool from './tools/EditTool';
 import ConvertTool from './tools/ConvertTool';
+import SplitTool from './tools/SplitTool';
+import MergeTool from './tools/MergeTool';
 
 const Workspace = () => {
-  const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
+  const { selectedFileId, activeMode, files } = useAppStore();
   const selectedFile = files.find((f) => f.id === selectedFileId);
-  const [splitPageRanges, setSplitPageRanges] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [includeHighlights, setIncludeHighlights] = useState(false);
-
-  // Map mergeSelection to files, preserving the selection order
-  const filesToMerge = mergeSelection
-    .map((id) => files.find((f) => f.id === id))
-    .filter((f): f is FileMetadata => f !== undefined);
-
-  const handleSplitPdf = async () => {
-    if (!selectedFile) {
-      toast.error('No PDF file selected to split.');
-      return;
-    }
-    if (!splitPageRanges) {
-      toast.error('Please enter page ranges to split.');
-      return;
-    }
-
-    if (!selectedFile.downloadURL) {
-      toast.error('File URL is missing: cannot result split.');
-      return;
-    }
-
-    setIsProcessing(true);
-    toast.info('Splitting PDF...', { id: 'pdf-processing' });
-    try {
-      let arrayBuffer = await fetch(selectedFile.downloadURL).then((res) =>
-        res.arrayBuffer()
-      );
-
-      // Always embed if we have any annotations or bookmarks
-      if (selectedFile.annotations?.length || selectedFile.bookmarks?.length) {
-        toast.info('Embedding annotations...', { id: 'pdf-processing' });
-
-        // Filter out highlights if not requested
-        const filteredAnnotations = (selectedFile.annotations || []).filter(a =>
-          // Always keep signatures and text (notes)
-          a.type === 'signature' || a.type === 'text' ||
-          // Keep highlights only if toggle is checked
-          (includeHighlights && a.type === 'highlight')
-        );
-
-        const annotatedBytes = await embedAnnotationsInPdf(
-          arrayBuffer,
-          filteredAnnotations,
-          undefined, // Let it infer dimensions
-          selectedFile.bookmarks
-        );
-        arrayBuffer = annotatedBytes.buffer as ArrayBuffer;
-      }
-
-      const output = await splitPdf(arrayBuffer, splitPageRanges, selectedFile.name);
-      output.forEach(({ bytes, filename }) => {
-        downloadPdf(bytes, filename);
-      });
-      toast.success('PDF split successfully and downloaded!', { id: 'pdf-processing' });
-      setSplitPageRanges(''); // Clear input
-    } catch (error) {
-      console.error('Error splitting PDF:', error);
-      toast.error(`Failed to split PDF: ${error instanceof Error ? error.message : String(error)}`, { id: 'pdf-processing' });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleMergePdfs = async () => {
-    if (filesToMerge.length < 2) {
-      toast.error('Please select at least two PDF files to merge.');
-      return;
-    }
-
-    setIsProcessing(true);
-    toast.info('Merging PDFs...', { id: 'pdf-processing' });
-    try {
-      const arrayBuffers = await Promise.all(
-        filesToMerge.map(async (file) => {
-          if (!file.downloadURL) {
-            throw new Error(`Missing download URL for file: ${file.name}`);
-          }
-          let buffer = await fetch(file.downloadURL).then(res => res.arrayBuffer());
-
-          // Always embed if available
-          if (file.annotations?.length || file.bookmarks?.length) {
-            const filteredAnnotations = (file.annotations || []).filter(a =>
-              a.type === 'signature' || a.type === 'text' ||
-              (includeHighlights && a.type === 'highlight')
-            );
-
-            const annotatedBytes = await embedAnnotationsInPdf(
-              buffer,
-              filteredAnnotations,
-              undefined,
-              file.bookmarks
-            );
-            buffer = annotatedBytes.buffer as ArrayBuffer;
-          }
-          return buffer;
-        })
-      );
-
-      const { bytes, filename } = await mergePdfs(arrayBuffers, 'merged_pdfs.pdf');
-      downloadPdf(bytes, filename);
-      toast.success('PDFs merged successfully and downloaded!', { id: 'pdf-processing' });
-    } catch (error) {
-      console.error('Error merging PDFs:', error);
-      toast.error(`Failed to merge PDFs: ${error instanceof Error ? error.message : String(error)}`, { id: 'pdf-processing' });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+  const noFile = (msg: string) => <p className="text-center text-muted-foreground">{msg}</p>;
 
   return (
     <Card className="flex h-full flex-col overflow-hidden">
@@ -143,126 +25,44 @@ const Workspace = () => {
       <CardContent className="flex flex-grow flex-col space-y-4 overflow-y-auto">
 
         {activeMode === 'view' && (
-          selectedFile ? (
-            <PDFViewer file={selectedFile} />
-          ) : (
-            <p className="text-center text-muted-foreground">Select a PDF from the sidebar to view.</p>
-          )
+          selectedFile
+            ? <PDFViewer file={selectedFile} />
+            : noFile('Select a PDF from the sidebar to view.')
         )}
 
         {activeMode === 'split' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex min-w-0">
-              <span className="flex-shrink-0">Split PDF:&nbsp;</span>
-              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
-            </h3>
-            {selectedFile ? (
-              <>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
-                    <Input
-                      id="page-ranges"
-                      type="text"
-                      value={splitPageRanges}
-                      onChange={(e) => setSplitPageRanges(e.target.value)}
-                      placeholder="e.g., 1, 3-5, 7"
-                      disabled={isProcessing}
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="include-highlights-split"
-                      checked={includeHighlights}
-                      onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
-                      disabled={isProcessing}
-                    />
-                    <Label htmlFor="include-highlights-split" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                      Include Highlights
-                    </Label>
-                  </div>
-
-                  <Button onClick={handleSplitPdf} disabled={isProcessing}>
-                    {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Split PDF
-                  </Button>
-                </div>
-                <PDFViewer file={selectedFile} />
-              </>
-            ) : (
-              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to split.</p>
-            )}
-          </div>
+          selectedFile
+            ? <SplitTool file={selectedFile} />
+            : noFile('Select a PDF from the sidebar to split.')
         )}
 
-        {activeMode === 'merge' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold">Merge PDFs</h3>
-            {filesToMerge.length > 0 ? (
-              <div className="space-y-4">
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    Drag to reorder ({filesToMerge.length} selected):
-                  </p>
-                  <MergeOrderList files={filesToMerge} />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Checkbox
-                    id="include-highlights-merge"
-                    checked={includeHighlights}
-                    onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
-                    disabled={isProcessing}
-                  />
-                  <Label htmlFor="include-highlights-merge" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    Include Highlights
-                  </Label>
-                </div>
-
-                <Button onClick={handleMergePdfs} disabled={isProcessing || filesToMerge.length < 2}>
-                  {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Merge Selected PDFs
-                </Button>
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground">Select at least two PDFs from the sidebar to merge.</p>
-            )}
-          </div>
-        )}
+        {activeMode === 'merge' && <MergeTool />}
 
         {activeMode === 'convert' && (
-          selectedFile ? (
-            <ConvertTool file={selectedFile} />
-          ) : (
-            <p className="text-center text-muted-foreground">Select a PDF from the sidebar to convert.</p>
-          )
+          selectedFile
+            ? <ConvertTool file={selectedFile} />
+            : noFile('Select a PDF from the sidebar to convert.')
         )}
 
         {activeMode === 'edit' && (
-          selectedFile ? (
-            <EditTool file={selectedFile} />
-          ) : (
-            <p className="text-center text-muted-foreground">Select a PDF from the sidebar to edit.</p>
-          )
+          selectedFile
+            ? <EditTool file={selectedFile} />
+            : noFile('Select a PDF from the sidebar to edit.')
         )}
 
         {activeMode === 'compress' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex min-w-0">
-              <span className="flex-shrink-0">Compress PDF:&nbsp;</span>
-              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
-            </h3>
-            {selectedFile ? (
-              <>
-                <CompressSidebar />
-                <PDFViewer file={selectedFile} />
-              </>
-            ) : (
-              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to compress.</p>
-            )}
-          </div>
+          selectedFile ? (
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex min-w-0">
+                <span className="flex-shrink-0">Compress PDF:&nbsp;</span>
+                <span className="truncate">{selectedFile.name}</span>
+              </h3>
+              <CompressSidebar />
+              <PDFViewer file={selectedFile} />
+            </div>
+          ) : noFile('Select a PDF from the sidebar to compress.')
         )}
+
       </CardContent>
     </Card>
   );

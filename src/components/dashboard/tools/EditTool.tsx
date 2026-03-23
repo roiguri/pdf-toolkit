@@ -173,7 +173,6 @@ const EditTool = ({ file }: EditToolProps) => {
       <PDFViewer
         ref={viewerRef}
         file={file}
-        showConvertButton={false}
         isEditMode={true}
         activeEditTool={activeEditTool}
         annotations={annotations}
