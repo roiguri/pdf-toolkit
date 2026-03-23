@@ -5,7 +5,7 @@ import { Page } from 'react-pdf';
 import { Loader2 } from 'lucide-react';
 import AnnotationOverlay from './AnnotationOverlay';
 import TextSelectionMenu from './TextSelectionMenu';
-import { useAppStore } from '@/store/useAppStore';
+import { Annotation } from '@/store/useAppStore';
 
 interface PDFPageProps {
   pageNumber: number;
@@ -13,10 +13,18 @@ interface PDFPageProps {
   containerWidth?: number;
   shouldRender: boolean;
   onAddAnnotation: (position: { x: number; y: number }) => void;
+  onAnnotationAdd: (annotation: Annotation) => void;
   onDimensionsChange?: (width: number, height: number) => void;
   searchQuery?: string;
   focusedMatchIndex?: number | null;
   defaultHeight?: number;
+  // Annotation display & interaction
+  isEditMode: boolean;
+  annotations: Annotation[];          // pre-filtered to this page by PDFViewer
+  selectedAnnotationId: string | null;
+  onAnnotationUpdate: (id: string, updates: Partial<Annotation>) => void;
+  onAnnotationDelete: (id: string) => void;
+  onAnnotationSelect: (id: string | null) => void;
 }
 
 const PageLoading = (
@@ -37,10 +45,17 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   containerWidth,
   shouldRender,
   onAddAnnotation,
+  onAnnotationAdd,
   onDimensionsChange,
   searchQuery,
   focusedMatchIndex,
   defaultHeight,
+  isEditMode,
+  annotations,
+  selectedAnnotationId,
+  onAnnotationUpdate,
+  onAnnotationDelete,
+  onAnnotationSelect,
 }, ref) => {
   const [canvasDimensions, setCanvasDimensions] = useState({ width: 0, height: 0 });
   const [highlights, setHighlights] = useState<HighlightRect[]>([]);
@@ -50,7 +65,6 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
 
   const pageContentRef = useRef<HTMLDivElement>(null);
   const textLayerRendered = useRef(false);
-  const { addAnnotation, activeMode } = useAppStore();
 
   // Function to calculate highlights without modifying DOM
   const calculateHighlights = useCallback(() => {
@@ -309,7 +323,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   const handleHighlight = (color: string) => {
     if (selectedRects.length === 0) return;
 
-    addAnnotation({
+    onAnnotationAdd({
       id: crypto.randomUUID(),
       pageNumber,
       type: 'highlight',
@@ -394,7 +408,13 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             canvasWidth={canvasDimensions.width}
             canvasHeight={canvasDimensions.height}
             scale={scale}
+            isEditMode={isEditMode}
+            annotations={annotations}
+            selectedAnnotationId={selectedAnnotationId}
             onAddAnnotation={onAddAnnotation}
+            onAnnotationUpdate={onAnnotationUpdate}
+            onAnnotationDelete={onAnnotationDelete}
+            onAnnotationSelect={onAnnotationSelect}
           />
         )}
 

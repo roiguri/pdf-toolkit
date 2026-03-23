@@ -86,17 +86,16 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   file,
   showConvertButton = true,
   toolbarSlot,
-  // New props — wired in Phase 3/4/5; declared here so callers can pass them
-  annotations: _annotationsProp,
-  selectedAnnotationId: _selectedAnnotationIdProp,
-  bookmarks: _bookmarksProp,
+  annotations: annotationsProp,
+  selectedAnnotationId: selectedAnnotationIdProp,
+  bookmarks: bookmarksProp,
   selectedBookmarkId: _selectedBookmarkIdProp,
-  isEditMode: _isEditModeProp,
+  isEditMode: isEditModeProp,
   activeEditTool: _activeEditToolProp,
-  onAnnotationAdd: _onAnnotationAdd,
-  onAnnotationUpdate: _onAnnotationUpdate,
-  onAnnotationDelete: _onAnnotationDelete,
-  onAnnotationSelect: _onAnnotationSelect,
+  onAnnotationAdd: onAnnotationAddProp,
+  onAnnotationUpdate: onAnnotationUpdateProp,
+  onAnnotationDelete: onAnnotationDeleteProp,
+  onAnnotationSelect: onAnnotationSelectProp,
   onBookmarkToggle: _onBookmarkToggle,
   onBookmarkSelect: _onBookmarkSelect,
 }: PDFViewerProps, ref) {
@@ -151,12 +150,25 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
     setSelectedAnnotationId,
     selectedAnnotationId,
     deleteAnnotation,
+    updateAnnotation,
     bookmarks,
     toggleBookmark,
     setSelectedBookmarkId
   } = useAppStore();
 
-  const isBookmarked = bookmarks.some(b => b.pageNumber === pageNumber);
+  // Effective values — props take precedence over store values.
+  // This allows tool components to supply their own data/callbacks while
+  // keeping the store as fallback so existing usage works unchanged.
+  const effectiveAnnotations = annotationsProp ?? annotations;
+  const effectiveSelectedAnnotationId = selectedAnnotationIdProp !== undefined ? selectedAnnotationIdProp : selectedAnnotationId;
+  const effectiveIsEditMode = isEditModeProp ?? (activeMode === 'edit');
+  const effectiveOnAnnotationAdd = onAnnotationAddProp ?? addAnnotation;
+  const effectiveOnAnnotationUpdate = onAnnotationUpdateProp ?? updateAnnotation;
+  const effectiveOnAnnotationDelete = onAnnotationDeleteProp ?? deleteAnnotation;
+  const effectiveOnAnnotationSelect = onAnnotationSelectProp ?? setSelectedAnnotationId;
+
+  const effectiveBookmarks = bookmarksProp ?? bookmarks;
+  const isBookmarked = effectiveBookmarks.some(b => b.pageNumber === pageNumber);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -964,6 +976,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
                         shouldRender={isNear || pageNum === 1} // Always render page 1 to start
                         defaultHeight={estimatedPageHeight}
                         onAddAnnotation={(pos) => onPageAddAnnotation(pos, pageNum)}
+                        onAnnotationAdd={effectiveOnAnnotationAdd}
                         onDimensionsChange={(w, h) => handlePageDimensionsChange(pageNum, w, h)}
                         searchQuery={debouncedSearchQuery}
                         focusedMatchIndex={
@@ -971,6 +984,12 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
                             ? searchResults[currentResultIndex].matchIndexOnPage
                             : null
                         }
+                        isEditMode={effectiveIsEditMode}
+                        annotations={effectiveAnnotations.filter(a => a.pageNumber === pageNum)}
+                        selectedAnnotationId={effectiveSelectedAnnotationId}
+                        onAnnotationUpdate={effectiveOnAnnotationUpdate}
+                        onAnnotationDelete={effectiveOnAnnotationDelete}
+                        onAnnotationSelect={effectiveOnAnnotationSelect}
                       />
                     );
                   })}

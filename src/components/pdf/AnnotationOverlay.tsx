@@ -1,6 +1,5 @@
 import React from 'react';
-import { useAppStore, Annotation } from '@/store/useAppStore';
-
+import { Annotation } from '@/store/useAppStore';
 import SignatureAnnotation from './SignatureAnnotation';
 
 interface AnnotationOverlayProps {
@@ -8,29 +7,30 @@ interface AnnotationOverlayProps {
   canvasWidth: number;
   canvasHeight: number;
   scale: number;
+  isEditMode: boolean;
+  annotations: Annotation[];  // pre-filtered to this page
+  selectedAnnotationId: string | null;
   onAddAnnotation: (position: { x: number; y: number }) => void;
+  onAnnotationUpdate: (id: string, updates: Partial<Annotation>) => void;
+  onAnnotationDelete: (id: string) => void;
+  onAnnotationSelect: (id: string | null) => void;
 }
 
 const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
-  pageNumber,
+  pageNumber: _pageNumber,
   canvasWidth,
   canvasHeight,
   scale,
+  isEditMode,
+  annotations,
+  selectedAnnotationId,
   onAddAnnotation,
+  onAnnotationUpdate,
+  onAnnotationDelete,
+  onAnnotationSelect,
 }) => {
-  const {
-    annotations,
-    activeMode,
-    updateAnnotation,
-    deleteAnnotation,
-    selectedAnnotationId,
-    setSelectedAnnotationId,
-  } = useAppStore();
-
-  const pageAnnotations = annotations.filter((ann) => ann.pageNumber === pageNumber);
-
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (activeMode !== 'edit') return;
+    if (!isEditMode) return;
 
     // Only handle clicks directly on the overlay, not on annotations
     if (e.target !== e.currentTarget) return;
@@ -41,41 +41,25 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
 
     // Deselect any selected annotation when clicking empty space
     if (selectedAnnotationId) {
-      setSelectedAnnotationId(null);
+      onAnnotationSelect(null);
       return;
     }
 
     onAddAnnotation({ x, y });
   };
 
-  const handleAnnotationDrag = (id: string, newPosition: { x: number; y: number }) => {
-    updateAnnotation(id, { position: newPosition });
-  };
-
-  const handleAnnotationSelect = (id: string) => {
-    setSelectedAnnotationId(id);
-  };
-
-  const handleAnnotationDelete = (id: string) => {
-    deleteAnnotation(id);
-  };
-
-  const handleAnnotationUpdate = (id: string, updates: Partial<Annotation>) => {
-    updateAnnotation(id, updates);
-  };
-
   return (
     <div
       className="absolute inset-0"
       style={{
-        pointerEvents: activeMode === 'edit' ? 'auto' : 'none',
+        pointerEvents: isEditMode ? 'auto' : 'none',
         width: canvasWidth,
         height: canvasHeight,
         zIndex: 50,
       }}
       onClick={handleOverlayClick}
     >
-      {pageAnnotations.map((annotation) => {
+      {annotations.map((annotation) => {
         // Validate canvas dimensions
         if (canvasWidth <= 0 || canvasHeight <= 0) return null;
 
@@ -95,9 +79,9 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
               isSelected={selectedAnnotationId === annotation.id}
               canvasWidth={canvasWidth}
               canvasHeight={canvasHeight}
-              onSelect={() => handleAnnotationSelect(annotation.id)}
-              onDelete={() => handleAnnotationDelete(annotation.id)}
-              onUpdate={(updates) => handleAnnotationUpdate(annotation.id, updates)}
+              onSelect={() => onAnnotationSelect(annotation.id)}
+              onDelete={() => onAnnotationDelete(annotation.id)}
+              onUpdate={(updates) => onAnnotationUpdate(annotation.id, updates)}
             />
           );
         }
@@ -110,7 +94,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
               style={{ pointerEvents: 'auto' }} // Allow clicking highlights
               onClick={(e) => {
                 e.stopPropagation();
-                handleAnnotationSelect(annotation.id);
+                onAnnotationSelect(annotation.id);
               }}
             >
               {annotation.rects.map((rect, i) => (
@@ -123,11 +107,8 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
                     width: rect.width * canvasWidth,
                     height: rect.height * canvasHeight,
                     backgroundColor: annotation.style?.color || '#ffff00',
-                    // Increased opacity and saturation for selected state
                     opacity: isSelected ? 0.7 : (annotation.style?.opacity || 0.4),
-                    // Removed border, added glow/shadow for selected state
                     boxShadow: isSelected ? `0 0 8px 2px ${annotation.style?.color || '#ffff00'}` : 'none',
-                    // Slight scale up for selected state
                     transform: isSelected ? 'scale(1.02)' : 'scale(1)',
                     zIndex: isSelected ? 10 : 1,
                   }}
