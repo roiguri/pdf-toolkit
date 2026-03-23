@@ -8,7 +8,6 @@ import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Image as ImageIcon,
   Loader2,
   ZoomIn,
   ZoomOut,
@@ -25,12 +24,9 @@ import {
   Bookmark as BookmarkIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
 import { FileMetadata } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
 import { useAppStore } from '@/store/useAppStore';
-import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
 import AnnotationsSidebar from './AnnotationsSidebar';
@@ -47,7 +43,6 @@ export interface PDFViewerHandle {
 
 interface PDFViewerProps {
   file: FileMetadata;
-  showConvertButton?: boolean;
   // New optional props — when provided, take precedence over store values
   annotations?: import('@/store/useAppStore').Annotation[];
   selectedAnnotationId?: string | null;
@@ -81,14 +76,13 @@ const DocumentError = <p>Failed to load PDF. Check CORS settings or file availab
 
 export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PDFViewer({
   file,
-  showConvertButton = true,
   toolbarSlot,
   annotations: annotationsProp,
   selectedAnnotationId: selectedAnnotationIdProp,
   bookmarks: bookmarksProp,
   selectedBookmarkId: _selectedBookmarkIdProp,
   isEditMode: isEditModeProp,
-  activeEditTool: _activeEditToolProp,
+  activeEditTool: activeEditToolProp,
   onAnnotationAdd: onAnnotationAddProp,
   onAnnotationUpdate: onAnnotationUpdateProp,
   onAnnotationDelete: onAnnotationDeleteProp,
@@ -96,19 +90,15 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   onBookmarkToggle: _onBookmarkToggle,
   onBookmarkSelect: _onBookmarkSelect,
   onSignaturePlacementRequest: onSignaturePlacementRequestProp,
-  activeEditTool: activeEditToolProp,
 }: PDFViewerProps, ref) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
-  const [isConverting, setIsConverting] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
   const [scale, setScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
-
-  const [includeHighlights, setIncludeHighlights] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -389,92 +379,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   }, [numPages]); // Re-run when numPages changes (and pages render)
 
 
-  const handleDownloadImage = async () => {
-    const pageEl = pageRefs.current.get(pageNumber);
-    if (!pageEl) {
-      toast.error('Current page not found.');
-      return;
-    }
-
-    // Determine if we need to burn annotations
-    // We burn if there are any non-highlight annotations, OR if there are highlights and user requested them.
-    const annotationsForPage = annotations.filter(a => a.pageNumber === pageNumber);
-    const hasSignaturesOrText = annotationsForPage.some(a => a.type === 'signature' || a.type === 'text');
-    const hasHighlights = annotationsForPage.some(a => a.type === 'highlight');
-    const shouldBurn = hasSignaturesOrText || (hasHighlights && includeHighlights);
-
-    setIsConverting(true);
-    toast.info('Converting page to image...', { id: 'image-conversion' });
-
-    try {
-      let imageDataUrl: string;
-
-      if (shouldBurn && file.downloadURL) {
-        // Filter annotations: always keep sigs/text, keep highlights if requested
-        const filteredAnnotations = annotations.filter(a =>
-          a.type === 'signature' || a.type === 'text' || (includeHighlights && a.type === 'highlight')
-        );
-
-        // Embed annotations into a temporary PDF buffer
-        // Note: we embed ALL annotations for the doc, then render the specific page
-        const pageDims = pagesDimensions[pageNumber];
-        const unscaledDimensions = pageDims ? {
-          width: pageDims.width / scale,
-          height: pageDims.height / scale,
-        } : undefined;
-
-        const annotatedPdfBytes = await embedAnnotationsInPdf(
-          file.downloadURL,
-          filteredAnnotations,
-          unscaledDimensions, // Best effort dimensions
-          // We don't strictly need bookmarks for image export, but no harm passing them if we have them
-          []
-        );
-
-        // Load this new PDF data into pdfjs
-        // We have to use a separate Document loading approach here just to render the one page to canvas
-        const loadingTask = pdfjs.getDocument({ data: annotatedPdfBytes });
-        const pdfDoc = await loadingTask.promise;
-        const page = await pdfDoc.getPage(pageNumber);
-
-        // Create an off-screen canvas
-        const viewport = page.getViewport({ scale: 1.5 }); // Higher scale for better quality
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) throw new Error('Could not get canvas context');
-
-        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-        imageDataUrl = canvas.toDataURL('image/png', 1.0);
-      } else {
-        // Fast path: existing canvas (likely no annotations needing burning or user unselected highlights and no signatures)
-        // However, if we possess signatures/text, we MUST burn them. The check 'shouldBurn' covers this.
-        // So this else block is only for when there are NO annotations at all effectively.
-        const canvas = pageEl.querySelector('canvas');
-        if (!canvas) {
-          toast.error('Page rendering not complete. Please wait a moment.');
-          return;
-        }
-        imageDataUrl = canvas.toDataURL('image/png', 1.0);
-      }
-
-      const link = document.createElement('a');
-      link.href = imageDataUrl;
-      link.download = `${file.name}_page_${pageNumber}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('Page converted and downloaded as image!', { id: 'image-conversion' });
-    } catch (error) {
-      console.error('Error converting page to image:', error);
-      toast.error('Failed to convert page to image.', { id: 'image-conversion' });
-    } finally {
-      setIsConverting(false);
-    }
-  };
-
   const handlePageDimensionsChange = useCallback((page: number, width: number, height: number) => {
     setPagesDimensions(prev => ({
       ...prev,
@@ -706,30 +610,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
-
-            {showConvertButton && (
-              <div className="flex items-center gap-2 ml-2 border-l pl-2">
-                <div className="flex items-center gap-2 mr-1">
-                  <Checkbox
-                    id="include-highlights-convert"
-                    checked={includeHighlights}
-                    onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
-                  />
-                  <Label htmlFor="include-highlights-convert" className="text-xs font-medium cursor-pointer text-muted-foreground whitespace-nowrap">
-                    Highlights
-                  </Label>
-                </div>
-                <Button
-                  onClick={handleDownloadImage}
-                  disabled={isConverting}
-                  variant="outline"
-                >
-                  {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  Convert to Image
-                </Button>
-              </div>
-            )}
           </div>
           {isSearching && (
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse" />

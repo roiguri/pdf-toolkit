@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
 import CompressSidebar from './CompressSidebar';
 import EditTool from './tools/EditTool';
+import ConvertTool from './tools/ConvertTool';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
@@ -143,7 +144,7 @@ const Workspace = () => {
 
         {activeMode === 'view' && (
           selectedFile ? (
-            <PDFViewer file={selectedFile} showConvertButton={false} />
+            <PDFViewer file={selectedFile} />
           ) : (
             <p className="text-center text-muted-foreground">Select a PDF from the sidebar to view.</p>
           )
@@ -187,7 +188,7 @@ const Workspace = () => {
                     Split PDF
                   </Button>
                 </div>
-                <PDFViewer file={selectedFile} showConvertButton={false} />
+                <PDFViewer file={selectedFile} />
               </>
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to split.</p>
@@ -231,21 +232,11 @@ const Workspace = () => {
         )}
 
         {activeMode === 'convert' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex min-w-0">
-              <span className="flex-shrink-0">Convert PDF to Image:&nbsp;</span>
-              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
-            </h3>
-            {selectedFile ? (
-              <p className="text-center text-muted-foreground">
-                To convert the current page to an image, please click the &quot;Convert to Image&quot; button within the PDF Viewer below.
-              </p>
-            ) : (
-              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to convert.</p>
-            )}
-            {/* The actual PDFViewer will handle the "Convert to Image" button */}
-            {selectedFile && <PDFViewer file={selectedFile} />}
-          </div>
+          selectedFile ? (
+            <ConvertTool file={selectedFile} />
+          ) : (
+            <p className="text-center text-muted-foreground">Select a PDF from the sidebar to convert.</p>
+          )
         )}
 
         {activeMode === 'edit' && (
@@ -265,7 +256,7 @@ const Workspace = () => {
             {selectedFile ? (
               <>
                 <CompressSidebar />
-                <PDFViewer file={selectedFile} showConvertButton={false} />
+                <PDFViewer file={selectedFile} />
               </>
             ) : (
               <p className="text-center text-muted-foreground">Select a PDF from the sidebar to compress.</p>
