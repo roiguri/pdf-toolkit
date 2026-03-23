@@ -333,12 +333,12 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
 
       {/* Main Content Wrapper */}
       <div className="flex flex-col sm:pl-16 w-full h-[calc(100vh-3.5rem)] sm:h-screen overflow-hidden">
-        <main className="grid flex-1 items-start gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_1fr] lg:grid-rows-1 overflow-y-auto">
-          <div className="lg:col-span-1 order-1 lg:order-1">
+        <main className="grid flex-1 gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_1fr] lg:grid-rows-1 overflow-hidden">
+          <div className="lg:col-span-1 order-1 lg:order-1 h-full">
             {/* Sidebar content (File Explorer) */}
             {sidebar}
           </div>
-          <div className="lg:col-span-2 order-2 lg:order-2">
+          <div className="lg:col-span-2 order-2 lg:order-2 h-full">
             {/* Main Workspace */}
             {main}
           </div>

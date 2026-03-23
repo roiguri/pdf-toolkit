@@ -1,14 +1,13 @@
 // src/components/pdf/PDFViewer.tsx
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
-  Image as ImageIcon,
   Loader2,
   ZoomIn,
   ZoomOut,
@@ -25,26 +24,39 @@ import {
   Bookmark as BookmarkIcon
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Label } from '@/components/ui/label';
-import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
+import { FileMetadata } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
-import { useAppStore } from '@/store/useAppStore';
-import SignatureModal from './SignatureModal';
-import EditToolbar from './EditToolbar';
-import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
-import { useAuth } from '@/components/auth/AuthProvider';
+import { Annotation, Bookmark, AnnotationType } from '@/store/useAppStore';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
-import { usePdfPersistence } from '@/hooks/usePdfPersistence';
 import AnnotationsSidebar from './AnnotationsSidebar';
 
 // Configure PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
 
+export interface PDFViewerHandle {
+  getPageElement: (pageNumber: number) => HTMLDivElement | null;
+  currentPage: number;
+  scale: number;
+  pagesDimensions: Record<number, { width: number; height: number }>;
+}
+
 interface PDFViewerProps {
   file: FileMetadata;
-  showConvertButton?: boolean;
+  annotations?: Annotation[];
+  selectedAnnotationId?: string | null;
+  bookmarks?: Bookmark[];
+  selectedBookmarkId?: string | null;
+  isEditMode?: boolean;
+  activeEditTool?: AnnotationType | null;
+  onAnnotationAdd?: (annotation: Annotation) => void;
+  onAnnotationUpdate?: (id: string, updates: Partial<Annotation>) => void;
+  onAnnotationDelete?: (id: string) => void;
+  onAnnotationSelect?: (id: string | null) => void;
+  onBookmarkToggle?: (pageNumber: number) => void;
+  onBookmarkSelect?: (id: string | null) => void;
+  toolbarSlot?: React.ReactNode;
+  onSignaturePlacementRequest?: (position: { x: number; y: number }, pageNumber: number) => void;
 }
 
 // Zoom constants
@@ -61,22 +73,31 @@ const DocumentLoading = (
 const DocumentNoData = <p>No PDF file selected or available.</p>;
 const DocumentError = <p>Failed to load PDF. Check CORS settings or file availability.</p>;
 
-export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) => {
-  // Persistence hook
-  usePdfPersistence();
-
+export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PDFViewer({
+  file,
+  toolbarSlot,
+  annotations: annotationsProp,
+  selectedAnnotationId: selectedAnnotationIdProp,
+  bookmarks: bookmarksProp,
+  selectedBookmarkId: _selectedBookmarkIdProp,
+  isEditMode: isEditModeProp,
+  activeEditTool: activeEditToolProp,
+  onAnnotationAdd: onAnnotationAddProp,
+  onAnnotationUpdate: onAnnotationUpdateProp,
+  onAnnotationDelete: onAnnotationDeleteProp,
+  onAnnotationSelect: onAnnotationSelectProp,
+  onBookmarkToggle: onBookmarkToggleProp,
+  onBookmarkSelect: onBookmarkSelectProp,
+  onSignaturePlacementRequest: onSignaturePlacementRequestProp,
+}: PDFViewerProps, ref) {
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
-  const [isConverting, setIsConverting] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
   const [scale, setScale] = useState<number>(1);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
-  const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
-
-  const [includeHighlights, setIncludeHighlights] = useState(false);
 
   // Search state
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -95,22 +116,35 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
-  const { currentUser } = useAuth();
 
-  const {
-    activeMode,
-    activeEditTool,
-    addAnnotation,
-    annotations,
-    setSelectedAnnotationId,
-    selectedAnnotationId,
-    deleteAnnotation,
-    bookmarks,
-    toggleBookmark,
-    setSelectedBookmarkId
-  } = useAppStore();
+  // Expose imperative handle for tools (e.g. ConvertTool needs canvas access)
+  useImperativeHandle(ref, () => ({
+    getPageElement: (page: number) => pageRefs.current.get(page) ?? null,
+    get currentPage() { return pageNumber; },
+    get scale() { return scale; },
+    get pagesDimensions() { return pagesDimensions; },
+  }), [pageNumber, scale, pagesDimensions]);
 
-  const isBookmarked = bookmarks.some(b => b.pageNumber === pageNumber);
+  // Effective values — all data and callbacks come from props; empty/no-op defaults for optional usage.
+  const effectiveAnnotations = annotationsProp ?? [];
+  const effectiveSelectedAnnotationId = selectedAnnotationIdProp ?? null;
+  const effectiveIsEditMode = isEditModeProp ?? false;
+  const effectiveActiveEditTool = activeEditToolProp ?? null;
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationAdd = onAnnotationAddProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationUpdate = onAnnotationUpdateProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationDelete = onAnnotationDeleteProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnAnnotationSelect = onAnnotationSelectProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnBookmarkToggle = onBookmarkToggleProp ?? (() => {});
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  const effectiveOnBookmarkSelect = onBookmarkSelectProp ?? (() => {});
+
+  const effectiveBookmarks = bookmarksProp ?? [];
+  const isBookmarked = effectiveBookmarks.some((b: Bookmark) => b.pageNumber === pageNumber);
 
   // Zoom functions
   const zoomIn = useCallback(() => {
@@ -336,92 +370,6 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   }, [numPages]); // Re-run when numPages changes (and pages render)
 
 
-  const handleDownloadImage = async () => {
-    const pageEl = pageRefs.current.get(pageNumber);
-    if (!pageEl) {
-      toast.error('Current page not found.');
-      return;
-    }
-
-    // Determine if we need to burn annotations
-    // We burn if there are any non-highlight annotations, OR if there are highlights and user requested them.
-    const annotationsForPage = annotations.filter(a => a.pageNumber === pageNumber);
-    const hasSignaturesOrText = annotationsForPage.some(a => a.type === 'signature' || a.type === 'text');
-    const hasHighlights = annotationsForPage.some(a => a.type === 'highlight');
-    const shouldBurn = hasSignaturesOrText || (hasHighlights && includeHighlights);
-
-    setIsConverting(true);
-    toast.info('Converting page to image...', { id: 'image-conversion' });
-
-    try {
-      let imageDataUrl: string;
-
-      if (shouldBurn && file.downloadURL) {
-        // Filter annotations: always keep sigs/text, keep highlights if requested
-        const filteredAnnotations = annotations.filter(a =>
-          a.type === 'signature' || a.type === 'text' || (includeHighlights && a.type === 'highlight')
-        );
-
-        // Embed annotations into a temporary PDF buffer
-        // Note: we embed ALL annotations for the doc, then render the specific page
-        const pageDims = pagesDimensions[pageNumber];
-        const unscaledDimensions = pageDims ? {
-          width: pageDims.width / scale,
-          height: pageDims.height / scale,
-        } : undefined;
-
-        const annotatedPdfBytes = await embedAnnotationsInPdf(
-          file.downloadURL,
-          filteredAnnotations,
-          unscaledDimensions, // Best effort dimensions
-          // We don't strictly need bookmarks for image export, but no harm passing them if we have them
-          []
-        );
-
-        // Load this new PDF data into pdfjs
-        // We have to use a separate Document loading approach here just to render the one page to canvas
-        const loadingTask = pdfjs.getDocument({ data: annotatedPdfBytes });
-        const pdfDoc = await loadingTask.promise;
-        const page = await pdfDoc.getPage(pageNumber);
-
-        // Create an off-screen canvas
-        const viewport = page.getViewport({ scale: 1.5 }); // Higher scale for better quality
-        const canvas = document.createElement('canvas');
-        canvas.width = viewport.width;
-        canvas.height = viewport.height;
-        const ctx = canvas.getContext('2d');
-
-        if (!ctx) throw new Error('Could not get canvas context');
-
-        await page.render({ canvasContext: ctx, viewport, canvas }).promise;
-        imageDataUrl = canvas.toDataURL('image/png', 1.0);
-      } else {
-        // Fast path: existing canvas (likely no annotations needing burning or user unselected highlights and no signatures)
-        // However, if we possess signatures/text, we MUST burn them. The check 'shouldBurn' covers this.
-        // So this else block is only for when there are NO annotations at all effectively.
-        const canvas = pageEl.querySelector('canvas');
-        if (!canvas) {
-          toast.error('Page rendering not complete. Please wait a moment.');
-          return;
-        }
-        imageDataUrl = canvas.toDataURL('image/png', 1.0);
-      }
-
-      const link = document.createElement('a');
-      link.href = imageDataUrl;
-      link.download = `${file.name}_page_${pageNumber}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      toast.success('Page converted and downloaded as image!', { id: 'image-conversion' });
-    } catch (error) {
-      console.error('Error converting page to image:', error);
-      toast.error('Failed to convert page to image.', { id: 'image-conversion' });
-    } finally {
-      setIsConverting(false);
-    }
-  };
-
   const handlePageDimensionsChange = useCallback((page: number, width: number, height: number) => {
     setPagesDimensions(prev => ({
       ...prev,
@@ -515,184 +463,44 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
   };
 
 
-  // We need to store the page number for the pending signature
-  const [pendingSignaturePage, setPendingSignaturePage] = useState<number | null>(null);
-
   const onPageAddAnnotation = useCallback((position: { x: number; y: number }, page: number) => {
-    if (activeMode !== 'edit') return;
-    if (activeEditTool === 'signature') {
-      setPendingSignaturePosition(position);
-      setPendingSignaturePage(page);
+    if (!effectiveIsEditMode) return;
+    if (effectiveActiveEditTool === 'signature' && onSignaturePlacementRequestProp) {
+      onSignaturePlacementRequestProp(position, page);
     }
-  }, [activeMode, activeEditTool]);
+  }, [effectiveIsEditMode, effectiveActiveEditTool, onSignaturePlacementRequestProp]);
 
-
-  const [savedSignature, setSavedSignature] = useState<UserSignature | null>(null);
-
-  useEffect(() => {
-    if (currentUser?.uid) {
-      const unsubscribe = subscribeToUserSignature(currentUser.uid, (signature) => {
-        setSavedSignature(signature);
-      });
-      return () => unsubscribe();
-    } else {
-      setSavedSignature(null);
-    }
-  }, [currentUser]);
-
-  // Handle saving signature from modal
-  const handleSaveSignature = useCallback(async (signatureDataUrl: string, width: number, height: number, saveToProfile: boolean) => {
-    if (!pendingSignaturePosition || pendingSignaturePage === null) return;
-
-    const targetPage = pendingSignaturePage;
-
-    // Get dimensions for the specific page
-    const dimensions = pagesDimensions[targetPage] || { width: 0, height: 0 };
-    // Fallback if dimensions missing (shouldn't happen if page rendered)
-    if (dimensions.width === 0) {
-      console.error("Missing dimensions for page", targetPage);
-      return;
-    }
-
-    if (saveToProfile && currentUser) {
-      try {
-        await saveUserSignature(currentUser.uid, signatureDataUrl, width, height);
-        toast.success('Signature saved to profile');
-        setSavedSignature({
-          id: 'default',
-          dataUrl: signatureDataUrl,
-          width,
-          height,
-          updatedAt: new Date()
-        });
-      } catch (error) {
-        console.error('Error saving signature:', error);
-        toast.error('Failed to save signature to profile');
-      }
-    }
-
-    const MAX_WIDTH = 120;
-    const MAX_HEIGHT = 60;
-    const aspectRatio = width / height;
-
-    let targetWidth = MAX_WIDTH;
-    let targetHeight = targetWidth / aspectRatio;
-
-    if (targetHeight > MAX_HEIGHT) {
-      targetHeight = MAX_HEIGHT;
-      targetWidth = targetHeight * aspectRatio;
-    }
-
-    const unscaledWidth = dimensions.width / scale;
-    const unscaledHeight = dimensions.height / scale;
-
-    const relativeWidth = unscaledWidth > 0 ? targetWidth / unscaledWidth : 0.15;
-    const relativeHeight = unscaledHeight > 0 ? targetHeight / unscaledHeight : 0.08;
-
-    const centeredPosition = {
-      x: pendingSignaturePosition.x - relativeWidth / 2,
-      y: pendingSignaturePosition.y - relativeHeight / 2,
-    };
-
-    const newAnnotation = {
-      id: crypto.randomUUID(),
-      pageNumber: targetPage,
-      type: 'signature' as const,
-      position: centeredPosition,
-      content: signatureDataUrl,
-      style: { width: relativeWidth, height: relativeHeight },
-    };
-    addAnnotation(newAnnotation);
-    setPendingSignaturePosition(null);
-    setPendingSignaturePage(null);
-  }, [pendingSignaturePosition, pendingSignaturePage, addAnnotation, pagesDimensions, scale, currentUser]);
-
-  // Handle exporting PDF with annotations
-  const handleExportWithAnnotations = useCallback(async () => {
-    if (annotations.length === 0 && bookmarks.length === 0) {
-      toast.info('No annotations or bookmarks to export');
-      return;
-    }
-
-    try {
-      toast.info('Exporting PDF...', { id: 'export-pdf' });
-
-      const firstPageDims = pagesDimensions[1] || Object.values(pagesDimensions)[0];
-
-      if (!firstPageDims) {
-        throw new Error("Page dimensions not available");
-      }
-
-      const unscaledDimensions = {
-        width: firstPageDims.width / scale,
-        height: firstPageDims.height / scale,
-      };
-
-      if (!file.downloadURL) {
-        throw new Error('File URL is missing');
-      }
-
-      // Filter annotations based on includeHighlights settings
-      // Always keep signature and text. Keep highlight only if checked.
-      const filteredAnnotations = annotations.filter(a =>
-        a.type === 'signature' || a.type === 'text' ||
-        (includeHighlights && a.type === 'highlight')
-      );
-
-      const pdfBytes = await embedAnnotationsInPdf(
-        file.downloadURL,
-        filteredAnnotations,
-        unscaledDimensions,
-        bookmarks
-      );
-
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${file.name}_annotated.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast.success('PDF exported successfully!', { id: 'export-pdf' });
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
-    }
-  }, [annotations, file, pagesDimensions, scale, bookmarks, includeHighlights]);
 
   // Handle delete key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeMode !== 'edit' || !selectedAnnotationId) return;
+      if (!effectiveIsEditMode || !effectiveSelectedAnnotationId) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        deleteAnnotation(selectedAnnotationId);
-        setSelectedAnnotationId(null);
+        effectiveOnAnnotationDelete(effectiveSelectedAnnotationId);
+        effectiveOnAnnotationSelect(null);
         toast.success('Annotation deleted');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeMode, selectedAnnotationId, deleteAnnotation, setSelectedAnnotationId]);
+  }, [effectiveIsEditMode, effectiveSelectedAnnotationId, effectiveOnAnnotationDelete, effectiveOnAnnotationSelect]);
 
   // Deselect when clicking the background
   const handleBackgroundClick = (e: React.MouseEvent) => {
     // If the click target is the container itself or a direct padding area, not a page
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('react-pdf__Document')) {
-      setSelectedAnnotationId(null);
-      setSelectedBookmarkId(null);
+      effectiveOnAnnotationSelect(null);
+      effectiveOnBookmarkSelect(null);
     }
   };
 
   return (
     <div
       ref={viewerContainerRef}
-      className={`flex flex-col w-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
+      className={`flex flex-col w-full h-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
     >
       {file ? (
         <>
@@ -768,7 +576,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             </div>
 
             <Button
-              onClick={() => toggleBookmark(pageNumber)}
+              onClick={() => effectiveOnBookmarkToggle(pageNumber)}
               variant={isBookmarked ? "default" : "outline"}
               size="icon"
               title={isBookmarked ? "Remove bookmark" : "Bookmark this page"}
@@ -793,50 +601,21 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
             <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
-
-            {showConvertButton && (
-              <div className="flex items-center gap-2 ml-2 border-l pl-2">
-                <div className="flex items-center gap-2 mr-1">
-                  <Checkbox
-                    id="include-highlights-convert"
-                    checked={includeHighlights}
-                    onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
-                  />
-                  <Label htmlFor="include-highlights-convert" className="text-xs font-medium cursor-pointer text-muted-foreground whitespace-nowrap">
-                    Highlights
-                  </Label>
-                </div>
-                <Button
-                  onClick={handleDownloadImage}
-                  disabled={isConverting}
-                  variant="outline"
-                >
-                  {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  <ImageIcon className="mr-2 h-4 w-4" />
-                  Convert to Image
-                </Button>
-              </div>
-            )}
           </div>
           {isSearching && (
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse" />
           )}
 
-          {activeMode === 'edit' && (
+          {toolbarSlot && (
             <div className="flex justify-center">
-              <EditToolbar
-                onExport={handleExportWithAnnotations}
-                includeHighlights={includeHighlights}
-                setIncludeHighlights={setIncludeHighlights}
-              />
+              {toolbarSlot}
             </div>
           )}
 
-          <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
+          <div className="flex flex-1 gap-2 overflow-hidden h-full">
             {/* Thumbnails */}
             {showThumbnails && (
-              <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-                }`}>
+              <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
                 <Document file={file.downloadURL} loading={null}>
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
@@ -872,8 +651,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
 
             {/* Scrollable PDF List */}
             <div
-              className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-                }`}
+              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable]"
               ref={pageContainerRef}
               {...bind()}
               onClick={handleBackgroundClick} // Handle outside click
@@ -913,6 +691,7 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                         shouldRender={isNear || pageNum === 1} // Always render page 1 to start
                         defaultHeight={estimatedPageHeight}
                         onAddAnnotation={(pos) => onPageAddAnnotation(pos, pageNum)}
+                        onAnnotationAdd={effectiveOnAnnotationAdd}
                         onDimensionsChange={(w, h) => handlePageDimensionsChange(pageNum, w, h)}
                         searchQuery={debouncedSearchQuery}
                         focusedMatchIndex={
@@ -920,6 +699,12 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
                             ? searchResults[currentResultIndex].matchIndexOnPage
                             : null
                         }
+                        isEditMode={effectiveIsEditMode}
+                        annotations={effectiveAnnotations.filter((a: Annotation) => a.pageNumber === pageNum)}
+                        selectedAnnotationId={effectiveSelectedAnnotationId}
+                        onAnnotationUpdate={effectiveOnAnnotationUpdate}
+                        onAnnotationDelete={effectiveOnAnnotationDelete}
+                        onAnnotationSelect={effectiveOnAnnotationSelect}
                       />
                     );
                   })}
@@ -932,15 +717,6 @@ export const PDFViewer = ({ file, showConvertButton = true }: PDFViewerProps) =>
         <p className="text-muted-foreground">Select a PDF to view.</p>
       )}
 
-      <SignatureModal
-        isOpen={!!pendingSignaturePosition}
-        onClose={() => {
-          setPendingSignaturePosition(null);
-          setPendingSignaturePage(null);
-        }}
-        onSave={handleSaveSignature}
-        savedSignature={savedSignature}
-      />
     </div>
   );
-};
+});

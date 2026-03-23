@@ -1,63 +1,25 @@
 // src/store/useAppStore.ts
 import { create } from 'zustand';
-import { FileMetadata, Annotation, AnnotationType, Bookmark } from '@/services/firestore';
+import { Annotation, AnnotationType, Bookmark } from '@/services/firestore';
 // Re-export types
 export type { Annotation, AnnotationType, Bookmark };
 
 export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
 
-interface AppState {
-  selectedFileId: string | null;
-  activeMode: AppMode;
-  files: FileMetadata[];
-  mergeSelection: string[];
-  // Annotation state
-  annotations: Annotation[];
-  bookmarks: Bookmark[];
-  activeEditTool: AnnotationType | null;
-  selectedAnnotationId: string | null;
-  selectedBookmarkId: string | null;
-  // Compression state
-  isCompressing: boolean;
-  compressAbortController: AbortController | null;
+import { createFileSlice, FileSlice } from './slices/fileSlice';
+import { createNavigationSlice, NavigationSlice } from './slices/navigationSlice';
+import { createAnnotationSlice, AnnotationSlice } from './slices/annotationSlice';
+import { createCompressionSlice, CompressionSlice } from './slices/compressionSlice';
 
-  // Folder state
-  currentFolderId: string | null;
-  setCurrentFolderId: (id: string | null) => void;
-
-  setSelectedFileId: (id: string | null) => void;
-  setActiveMode: (mode: AppMode) => void;
-  setFiles: (files: FileMetadata[]) => void;
-  addFileToMergeSelection: (fileId: string) => void;
-  removeFileFromMergeSelection: (fileId: string) => void;
-  reorderMergeSelection: (startIndex: number, endIndex: number) => void;
-  clearMergeSelection: () => void;
-  // Annotation actions
-  setActiveEditTool: (tool: AnnotationType | null) => void;
-  addAnnotation: (annotation: Annotation) => void;
-  updateAnnotation: (id: string, updates: Partial<Annotation>) => void;
-  deleteAnnotation: (id: string) => void;
-  setSelectedAnnotationId: (id: string | null) => void;
-  clearAnnotations: (type?: AnnotationType) => void;
-  setAnnotations: (annotations: Annotation[]) => void;
-  // Bookmark actions
-  addBookmark: (pageNumber: number) => void;
-  removeBookmark: (id: string) => void;
-  toggleBookmark: (pageNumber: number) => void;
-  updateBookmark: (id: string, updates: Partial<Bookmark>) => void;
-  setBookmarks: (bookmarks: Bookmark[]) => void;
-  setSelectedBookmarkId: (id: string | null) => void;
-
-  // Compression actions
-  setCompressionStatus: (isCompressing: boolean, controller?: AbortController | null) => void;
+export type AppState = FileSlice & NavigationSlice & AnnotationSlice & CompressionSlice & {
   reset: () => void;
-}
+};
 
 const initialState = {
   selectedFileId: null,
   activeMode: 'view' as AppMode,
   files: [],
-  currentFolderId: null, // Default to root
+  currentFolderId: null,
   mergeSelection: [],
   annotations: [] as Annotation[],
   bookmarks: [] as Bookmark[],
@@ -68,124 +30,11 @@ const initialState = {
   compressAbortController: null,
 };
 
-export const useAppStore = create<AppState>((set, get) => ({
-  ...initialState,
+export const useAppStore = create<AppState>()((set, get, store) => ({
+  ...createFileSlice(set, get, store),
+  ...createNavigationSlice(set, get, store),
+  ...createAnnotationSlice(set, get, store),
+  ...createCompressionSlice(set, get, store),
 
-  setCurrentFolderId: (id) => set({ currentFolderId: id }),
-  setSelectedFileId: (id) => {
-    // When file changes, try to load its annotations and bookmarks
-    const state = get();
-    const file = state.files.find((f) => f.id === id);
-    set({
-      selectedFileId: id,
-      annotations: file?.annotations || [],
-      bookmarks: file?.bookmarks || [],
-    });
-  },
-  setActiveMode: (mode) => set({ activeMode: mode }),
-  setFiles: (files) => {
-    // When files list updates (e.g. from firestore subscription), update annotations/bookmarks for current file
-    set((state) => {
-      // We update the files list, but we DO NOT overwrite the currently active 'annotations'
-      // or 'bookmarks' with the data from 'files'.
-      // The local state (state.annotations) is the source of truth while the user is editing.
-      // Overwriting it with server data (which might be slightly stale or just echoing back)
-      // causes race conditions where local changes are lost/reverted.
-      return {
-        files,
-      };
-    });
-  },
-  addFileToMergeSelection: (fileId) =>
-    set((state) => ({ mergeSelection: [...state.mergeSelection, fileId] })),
-  removeFileFromMergeSelection: (fileId) =>
-    set((state) => ({
-      mergeSelection: state.mergeSelection.filter((id) => id !== fileId),
-    })),
-  reorderMergeSelection: (startIndex, endIndex) =>
-    set((state) => {
-      const result = Array.from(state.mergeSelection);
-      const [removed] = result.splice(startIndex, 1);
-      result.splice(endIndex, 0, removed);
-      return { mergeSelection: result };
-    }),
-  clearMergeSelection: () => set({ mergeSelection: [] }),
-  // Annotation actions
-  setActiveEditTool: (tool) => set({ activeEditTool: tool }),
-  addAnnotation: (annotation) =>
-    set((state) => ({ annotations: [...state.annotations, annotation] })),
-  updateAnnotation: (id, updates) =>
-    set((state) => ({
-      annotations: state.annotations.map((ann) =>
-        ann.id === id ? { ...ann, ...updates } : ann
-      ),
-    })),
-  deleteAnnotation: (id) =>
-    set((state) => ({
-      annotations: state.annotations.filter((ann) => ann.id !== id),
-      selectedAnnotationId: state.selectedAnnotationId === id ? null : state.selectedAnnotationId,
-    })),
-  setSelectedAnnotationId: (id) =>
-    set((state) => {
-      if (state.selectedAnnotationId === id && id !== null) {
-        // Toggle off if already selected
-        return { selectedAnnotationId: null, selectedBookmarkId: null };
-      }
-      return { selectedAnnotationId: id, selectedBookmarkId: null };
-    }),
-  clearAnnotations: (type?: AnnotationType) =>
-    set((state) => ({
-      annotations: type
-        ? state.annotations.filter((a) => a.type !== type)
-        : [],
-      selectedAnnotationId: null,
-    })),
-  setAnnotations: (annotations) => set({ annotations }),
-
-  // Bookmark actions
-  addBookmark: (pageNumber) =>
-    set((state) => {
-      if (state.bookmarks.some((b) => b.pageNumber === pageNumber)) return state;
-      const newBookmark: Bookmark = {
-        id: crypto.randomUUID(),
-        pageNumber,
-        title: `Page ${pageNumber}`,
-        createdAt: Date.now(),
-      };
-      return { bookmarks: [...state.bookmarks, newBookmark].sort((a, b) => a.pageNumber - b.pageNumber) };
-    }),
-  removeBookmark: (id) =>
-    set((state) => ({ bookmarks: state.bookmarks.filter((b) => b.id !== id) })),
-  toggleBookmark: (pageNumber) =>
-    set((state) => {
-      const existing = state.bookmarks.find((b) => b.pageNumber === pageNumber);
-      if (existing) {
-        return { bookmarks: state.bookmarks.filter((b) => b.id !== existing.id) };
-      }
-      const newBookmark: Bookmark = {
-        id: crypto.randomUUID(),
-        pageNumber,
-        title: `Page ${pageNumber}`,
-        createdAt: Date.now(),
-      };
-      return { bookmarks: [...state.bookmarks, newBookmark].sort((a, b) => a.pageNumber - b.pageNumber) };
-    }),
-  updateBookmark: (id, updates) =>
-    set((state) => ({
-      bookmarks: state.bookmarks.map((b) => (b.id === id ? { ...b, ...updates } : b)),
-    })),
-  setBookmarks: (bookmarks) => set({ bookmarks: bookmarks.sort((a, b) => a.pageNumber - b.pageNumber) }),
-  setSelectedBookmarkId: (id) =>
-    set((state) => {
-      if (state.selectedBookmarkId === id && id !== null) {
-        // Toggle off if already selected
-        return { selectedBookmarkId: null, selectedAnnotationId: null };
-      }
-      return { selectedBookmarkId: id, selectedAnnotationId: null };
-    }),
-
-  // Compression actions
-  setCompressionStatus: (isCompressing, controller = null) =>
-    set({ isCompressing, compressAbortController: controller }),
   reset: () => set(initialState),
 }));
