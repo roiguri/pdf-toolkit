@@ -500,7 +500,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   return (
     <div
       ref={viewerContainerRef}
-      className={`flex flex-col w-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
+      className={`flex flex-col w-full h-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
     >
       {file ? (
         <>
@@ -612,11 +612,10 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </div>
           )}
 
-          <div className={`flex flex-1 gap-2 overflow-hidden ${isFullscreen ? 'h-full' : ''}`}>
+          <div className="flex flex-1 gap-2 overflow-hidden h-full">
             {/* Thumbnails */}
             {showThumbnails && (
-              <div className={`w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2 ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-                }`}>
+              <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
                 <Document file={file.downloadURL} loading={null}>
                   {Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
@@ -652,8 +651,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
 
             {/* Scrollable PDF List */}
             <div
-              className={`border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] ${isFullscreen ? 'h-full' : 'max-h-[50vh] sm:max-h-[60vh]'
-                }`}
+              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable]"
               ref={pageContainerRef}
               {...bind()}
               onClick={handleBackgroundClick} // Handle outside click

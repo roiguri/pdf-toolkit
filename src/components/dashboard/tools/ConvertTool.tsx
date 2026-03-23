@@ -100,7 +100,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
   };
 
   return (
-    <>
+    <div className="flex flex-col h-full gap-4">
       <div className="flex items-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg w-fit mx-auto">
         <div className="flex items-center space-x-2">
           <Checkbox
@@ -120,8 +120,10 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
         </Button>
       </div>
 
-      <PDFViewer ref={viewerRef} file={file} annotations={annotations} bookmarks={[]} />
-    </>
+      <div className="flex-1 min-h-0">
+        <PDFViewer ref={viewerRef} file={file} annotations={annotations} bookmarks={[]} />
+      </div>
+    </div>
   );
 };
 

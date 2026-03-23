@@ -13,13 +13,15 @@ const CompressTool = ({ file }: CompressToolProps) => {
   const { annotations } = useAppStore();
 
   return (
-    <div className="space-y-4">
+    <div className="flex flex-col h-full space-y-4">
       <h3 className="text-lg font-semibold flex min-w-0">
         <span className="flex-shrink-0">Compress PDF:&nbsp;</span>
         <span className="truncate">{file.name}</span>
       </h3>
       <CompressSidebar />
-      <PDFViewer file={file} annotations={annotations} />
+      <div className="flex-1 min-h-0">
+        <PDFViewer file={file} annotations={annotations} />
+      </div>
     </div>
   );
 };

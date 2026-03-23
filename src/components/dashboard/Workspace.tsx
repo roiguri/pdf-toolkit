@@ -22,7 +22,7 @@ const Workspace = () => {
         <CardTitle>Workspace</CardTitle>
         <ActionToolbar />
       </CardHeader>
-      <CardContent className="flex flex-grow flex-col space-y-4 overflow-y-auto">
+      <CardContent className="flex flex-grow flex-col space-y-4 overflow-hidden">
 
         {activeMode === 'view' && (
           selectedFile ? <ViewTool file={selectedFile} /> : noFile('Select a PDF from the sidebar to view.')
