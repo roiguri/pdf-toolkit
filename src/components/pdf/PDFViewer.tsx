@@ -27,16 +27,12 @@ import {
 import { toast } from 'sonner';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import { FileMetadata, saveUserSignature, subscribeToUserSignature, UserSignature } from '@/services/firestore';
+import { FileMetadata } from '@/services/firestore';
 import { usePinch } from '@use-gesture/react';
 import { useAppStore } from '@/store/useAppStore';
-import SignatureModal from './SignatureModal';
-import EditToolbar from './EditToolbar';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
-import { useAuth } from '@/components/auth/AuthProvider';
 import { PDFPage } from './PDFPage';
 import { Page } from 'react-pdf';
-import { usePdfPersistence } from '@/hooks/usePdfPersistence';
 import AnnotationsSidebar from './AnnotationsSidebar';
 
 // Configure PDF.js worker
@@ -66,6 +62,7 @@ interface PDFViewerProps {
   onBookmarkToggle?: (pageNumber: number) => void;
   onBookmarkSelect?: (id: string | null) => void;
   toolbarSlot?: React.ReactNode;
+  onSignaturePlacementRequest?: (position: { x: number; y: number }, pageNumber: number) => void;
 }
 
 // Zoom constants
@@ -98,10 +95,9 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   onAnnotationSelect: onAnnotationSelectProp,
   onBookmarkToggle: _onBookmarkToggle,
   onBookmarkSelect: _onBookmarkSelect,
+  onSignaturePlacementRequest: onSignaturePlacementRequestProp,
+  activeEditTool: activeEditToolProp,
 }: PDFViewerProps, ref) {
-  // Persistence hook
-  usePdfPersistence();
-
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
@@ -111,7 +107,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showThumbnails, setShowThumbnails] = useState(false);
   const [showBookmarks, setShowBookmarks] = useState(false);
-  const [pendingSignaturePosition, setPendingSignaturePosition] = useState<{ x: number; y: number } | null>(null);
 
   const [includeHighlights, setIncludeHighlights] = useState(false);
 
@@ -132,7 +127,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   const pageContainerRef = useRef<HTMLDivElement>(null);
   const pdfContentRef = useRef<HTMLDivElement>(null);
   const viewerContainerRef = useRef<HTMLDivElement>(null);
-  const { currentUser } = useAuth();
 
   // Expose imperative handle for tools (e.g. ConvertTool needs canvas access)
   useImperativeHandle(ref, () => ({
@@ -162,6 +156,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   const effectiveAnnotations = annotationsProp ?? annotations;
   const effectiveSelectedAnnotationId = selectedAnnotationIdProp !== undefined ? selectedAnnotationIdProp : selectedAnnotationId;
   const effectiveIsEditMode = isEditModeProp ?? (activeMode === 'edit');
+  const effectiveActiveEditTool = activeEditToolProp ?? activeEditTool;
   const effectiveOnAnnotationAdd = onAnnotationAddProp ?? addAnnotation;
   const effectiveOnAnnotationUpdate = onAnnotationUpdateProp ?? updateAnnotation;
   const effectiveOnAnnotationDelete = onAnnotationDeleteProp ?? deleteAnnotation;
@@ -573,176 +568,36 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   };
 
 
-  // We need to store the page number for the pending signature
-  const [pendingSignaturePage, setPendingSignaturePage] = useState<number | null>(null);
-
   const onPageAddAnnotation = useCallback((position: { x: number; y: number }, page: number) => {
-    if (activeMode !== 'edit') return;
-    if (activeEditTool === 'signature') {
-      setPendingSignaturePosition(position);
-      setPendingSignaturePage(page);
+    if (!effectiveIsEditMode) return;
+    if (effectiveActiveEditTool === 'signature' && onSignaturePlacementRequestProp) {
+      onSignaturePlacementRequestProp(position, page);
     }
-  }, [activeMode, activeEditTool]);
+  }, [effectiveIsEditMode, effectiveActiveEditTool, onSignaturePlacementRequestProp]);
 
-
-  const [savedSignature, setSavedSignature] = useState<UserSignature | null>(null);
-
-  useEffect(() => {
-    if (currentUser?.uid) {
-      const unsubscribe = subscribeToUserSignature(currentUser.uid, (signature) => {
-        setSavedSignature(signature);
-      });
-      return () => unsubscribe();
-    } else {
-      setSavedSignature(null);
-    }
-  }, [currentUser]);
-
-  // Handle saving signature from modal
-  const handleSaveSignature = useCallback(async (signatureDataUrl: string, width: number, height: number, saveToProfile: boolean) => {
-    if (!pendingSignaturePosition || pendingSignaturePage === null) return;
-
-    const targetPage = pendingSignaturePage;
-
-    // Get dimensions for the specific page
-    const dimensions = pagesDimensions[targetPage] || { width: 0, height: 0 };
-    // Fallback if dimensions missing (shouldn't happen if page rendered)
-    if (dimensions.width === 0) {
-      console.error("Missing dimensions for page", targetPage);
-      return;
-    }
-
-    if (saveToProfile && currentUser) {
-      try {
-        await saveUserSignature(currentUser.uid, signatureDataUrl, width, height);
-        toast.success('Signature saved to profile');
-        setSavedSignature({
-          id: 'default',
-          dataUrl: signatureDataUrl,
-          width,
-          height,
-          updatedAt: new Date()
-        });
-      } catch (error) {
-        console.error('Error saving signature:', error);
-        toast.error('Failed to save signature to profile');
-      }
-    }
-
-    const MAX_WIDTH = 120;
-    const MAX_HEIGHT = 60;
-    const aspectRatio = width / height;
-
-    let targetWidth = MAX_WIDTH;
-    let targetHeight = targetWidth / aspectRatio;
-
-    if (targetHeight > MAX_HEIGHT) {
-      targetHeight = MAX_HEIGHT;
-      targetWidth = targetHeight * aspectRatio;
-    }
-
-    const unscaledWidth = dimensions.width / scale;
-    const unscaledHeight = dimensions.height / scale;
-
-    const relativeWidth = unscaledWidth > 0 ? targetWidth / unscaledWidth : 0.15;
-    const relativeHeight = unscaledHeight > 0 ? targetHeight / unscaledHeight : 0.08;
-
-    const centeredPosition = {
-      x: pendingSignaturePosition.x - relativeWidth / 2,
-      y: pendingSignaturePosition.y - relativeHeight / 2,
-    };
-
-    const newAnnotation = {
-      id: crypto.randomUUID(),
-      pageNumber: targetPage,
-      type: 'signature' as const,
-      position: centeredPosition,
-      content: signatureDataUrl,
-      style: { width: relativeWidth, height: relativeHeight },
-    };
-    addAnnotation(newAnnotation);
-    setPendingSignaturePosition(null);
-    setPendingSignaturePage(null);
-  }, [pendingSignaturePosition, pendingSignaturePage, addAnnotation, pagesDimensions, scale, currentUser]);
-
-  // Handle exporting PDF with annotations
-  const handleExportWithAnnotations = useCallback(async () => {
-    if (annotations.length === 0 && bookmarks.length === 0) {
-      toast.info('No annotations or bookmarks to export');
-      return;
-    }
-
-    try {
-      toast.info('Exporting PDF...', { id: 'export-pdf' });
-
-      const firstPageDims = pagesDimensions[1] || Object.values(pagesDimensions)[0];
-
-      if (!firstPageDims) {
-        throw new Error("Page dimensions not available");
-      }
-
-      const unscaledDimensions = {
-        width: firstPageDims.width / scale,
-        height: firstPageDims.height / scale,
-      };
-
-      if (!file.downloadURL) {
-        throw new Error('File URL is missing');
-      }
-
-      // Filter annotations based on includeHighlights settings
-      // Always keep signature and text. Keep highlight only if checked.
-      const filteredAnnotations = annotations.filter(a =>
-        a.type === 'signature' || a.type === 'text' ||
-        (includeHighlights && a.type === 'highlight')
-      );
-
-      const pdfBytes = await embedAnnotationsInPdf(
-        file.downloadURL,
-        filteredAnnotations,
-        unscaledDimensions,
-        bookmarks
-      );
-
-      const blob = new Blob([pdfBytes as BlobPart], { type: 'application/pdf' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `${file.name}_annotated.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-
-      toast.success('PDF exported successfully!', { id: 'export-pdf' });
-    } catch (error) {
-      console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
-    }
-  }, [annotations, file, pagesDimensions, scale, bookmarks, includeHighlights]);
 
   // Handle delete key
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (activeMode !== 'edit' || !selectedAnnotationId) return;
+      if (!effectiveIsEditMode || !effectiveSelectedAnnotationId) return;
 
       if (e.key === 'Delete' || e.key === 'Backspace') {
         e.preventDefault();
-        deleteAnnotation(selectedAnnotationId);
-        setSelectedAnnotationId(null);
+        effectiveOnAnnotationDelete(effectiveSelectedAnnotationId);
+        effectiveOnAnnotationSelect(null);
         toast.success('Annotation deleted');
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeMode, selectedAnnotationId, deleteAnnotation, setSelectedAnnotationId]);
+  }, [effectiveIsEditMode, effectiveSelectedAnnotationId, effectiveOnAnnotationDelete, effectiveOnAnnotationSelect]);
 
   // Deselect when clicking the background
   const handleBackgroundClick = (e: React.MouseEvent) => {
     // If the click target is the container itself or a direct padding area, not a page
     if (e.target === e.currentTarget || (e.target as HTMLElement).classList.contains('react-pdf__Document')) {
-      setSelectedAnnotationId(null);
+      effectiveOnAnnotationSelect(null);
       setSelectedBookmarkId(null);
     }
   };
@@ -880,15 +735,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             <div className="absolute top-0 left-0 w-full h-1 bg-primary/20 animate-pulse" />
           )}
 
-          {activeMode === 'edit' && !toolbarSlot && (
-            <div className="flex justify-center">
-              <EditToolbar
-                onExport={handleExportWithAnnotations}
-                includeHighlights={includeHighlights}
-                setIncludeHighlights={setIncludeHighlights}
-              />
-            </div>
-          )}
           {toolbarSlot && (
             <div className="flex justify-center">
               {toolbarSlot}
@@ -1002,15 +848,6 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
         <p className="text-muted-foreground">Select a PDF to view.</p>
       )}
 
-      <SignatureModal
-        isOpen={!!pendingSignaturePosition}
-        onClose={() => {
-          setPendingSignaturePosition(null);
-          setPendingSignaturePage(null);
-        }}
-        onSave={handleSaveSignature}
-        savedSignature={savedSignature}
-      />
     </div>
   );
 });

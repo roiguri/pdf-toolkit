@@ -16,6 +16,7 @@ import { splitPdf, mergePdfs, downloadPdf, embedAnnotationsInPdf } from '@/lib/p
 import { Label } from '@/components/ui/label';
 import MergeOrderList from './MergeOrderList';
 import CompressSidebar from './CompressSidebar';
+import EditTool from './tools/EditTool';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files, mergeSelection } = useAppStore();
@@ -248,17 +249,11 @@ const Workspace = () => {
         )}
 
         {activeMode === 'edit' && (
-          <div className="space-y-4">
-            <h3 className="text-lg font-semibold flex min-w-0">
-              <span className="flex-shrink-0">Edit PDF:&nbsp;</span>
-              <span className="truncate">{selectedFile?.name || 'No file selected'}</span>
-            </h3>
-            {selectedFile ? (
-              <PDFViewer file={selectedFile} showConvertButton={false} />
-            ) : (
-              <p className="text-center text-muted-foreground">Select a PDF from the sidebar to edit.</p>
-            )}
-          </div>
+          selectedFile ? (
+            <EditTool file={selectedFile} />
+          ) : (
+            <p className="text-center text-muted-foreground">Select a PDF from the sidebar to edit.</p>
+          )
         )}
 
         {activeMode === 'compress' && (
