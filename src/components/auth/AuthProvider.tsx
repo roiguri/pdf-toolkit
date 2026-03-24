@@ -69,8 +69,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await signInWithPopup(auth, provider);
       router.push('/dashboard');
     } catch (error) {
-      console.error('Google Sign-In Error:', error);
-      // Handle error (e.g., display a toast notification)
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -82,8 +81,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       await signInWithEmailAndPassword(auth, email, password);
       router.push('/dashboard');
     } catch (error) {
-      console.error('Email/Password Sign-In Error:', error);
-      // Handle error
+      throw error;
     } finally {
       setLoading(false);
     }

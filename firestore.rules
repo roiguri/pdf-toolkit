@@ -7,6 +7,11 @@ service cloud.firestore {
       return request.auth != null && request.auth.uid == userId;
     }
 
+    // Invites — managed via Admin SDK only, no client access
+    match /invites/{email} {
+      allow read, write: if false;
+    }
+
     // Lock down users collection
     match /users/{userId} {
       allow read, write: if isOwner(userId);
