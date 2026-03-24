@@ -152,6 +152,77 @@ curl -X POST https://your-app.netlify.app/api/pdf/convert \
 
 ---
 
+### POST `/api/pdf/scan`
+
+Convert one or more images to a scanned PDF. Images are auto-detected and perspective-corrected. Optionally supply explicit corners (web UI path).
+
+**Request** — `multipart/form-data`
+
+| Field | Type | Required | Default | Description |
+|---|---|---|---|---|
+| `images` | File[] (image) | Yes | — | One or more image files (repeat field for each) |
+| `enhance` | string | No | `"true"` | Apply adaptive contrast enhancement: `"true"` or `"false"` |
+| `corners_N` | string | No | — | Explicit corners for image N (0-indexed): `"x1,y1,x2,y2,x3,y3,x4,y4"` in TL→TR→BR→BL order |
+
+**Response**
+
+- `200 OK` — `application/pdf` binary
+- `400` — missing images
+- `401` — unauthorized
+- `502` — scan service error
+- `500` — processing error
+
+**Example**
+
+```bash
+# Automatic detection (bot/CLI)
+curl -X POST https://your-app.netlify.app/api/pdf/scan \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "images=@photo1.jpg" \
+  -F "images=@photo2.jpg" \
+  --output scanned.pdf
+
+# With explicit corners (web UI path, corners in original image pixels)
+curl -X POST https://your-app.netlify.app/api/pdf/scan \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "images=@photo.jpg" \
+  -F "corners_0=50,60,540,55,545,720,48,715" \
+  --output scanned.pdf
+```
+
+---
+
+### POST `/api/pdf/scan/detect`
+
+Detect document corners in a single image. Used by the web UI to show draggable handles before scanning.
+
+**Request** — `multipart/form-data`
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `file` | File (image) | Yes | The source image |
+
+**Response**
+
+- `200 OK` — JSON `{ corners: [[x,y],[x,y],[x,y],[x,y]] | null, width: number, height: number }`
+  - `corners` is `null` if no document was detected (UI should fall back to full-image corners)
+  - Corners are in original image pixel coordinates, ordered TL→TR→BR→BL
+- `400` — missing file
+- `401` — unauthorized
+- `502` — detection service error
+- `500` — processing error
+
+**Example**
+
+```bash
+curl -X POST https://your-app.netlify.app/api/pdf/scan/detect \
+  -H "Authorization: Bearer <API_KEY>" \
+  -F "file=@photo.jpg"
+# Response: {"corners": [[44,0],[1152,0],[1152,1540],[71,1502]], "width": 1152, "height": 2048}
+```
+
+---
+
 ## Error Response Format
 
 All errors return JSON:
