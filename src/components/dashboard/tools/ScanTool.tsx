@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Loader2, Upload, ArrowLeft, ScanLine, PlusCircle } from 'lucide-react';
-
-const PYTHON_API = 'https://pdf-compressor-621306512794.us-central1.run.app';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 type Corner = [number, number]; // [x, y] in original image coords
 
@@ -203,6 +202,7 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
 // --- Main ScanTool ---
 
 const ScanTool = () => {
+  const { currentUser } = useAuth();
   const [images, setImages] = useState<ScannedImage[]>([]);
   const [step, setStep] = useState<'upload' | 'adjust'>('upload');
   const [enhance, setEnhance] = useState(true);
@@ -233,7 +233,12 @@ const ScanTool = () => {
     try {
       const form = new FormData();
       form.append('file', file);
-      const res = await fetch(`${PYTHON_API}/detect`, { method: 'POST', body: form });
+      const idToken = await currentUser!.getIdToken();
+      const res = await fetch('/api/pdf/scan/detect', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+        body: form,
+      });
       const data = await res.json();
 
       const clamp = ([x, y]: Corner): Corner => [
@@ -303,7 +308,12 @@ const ScanTool = () => {
         form.append(`corners_${i}`, c.flat().join(','));
       }
 
-      const res = await fetch(`${PYTHON_API}/scan`, { method: 'POST', body: form });
+      const idToken = await currentUser!.getIdToken();
+      const res = await fetch('/api/pdf/scan', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
+        body: form,
+      });
       if (!res.ok) throw new Error(await res.text());
 
       const blob = await res.blob();

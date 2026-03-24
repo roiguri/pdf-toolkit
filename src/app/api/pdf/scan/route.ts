@@ -1,10 +1,10 @@
 import { NextRequest } from 'next/server';
+import { verifyAuth } from '@/lib/verify-auth';
 
 const SCAN_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/scan';
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.PDF_API_KEY;
-  if (!apiKey || req.headers.get('Authorization') !== `Bearer ${apiKey}`) {
+  if (!await verifyAuth(req)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

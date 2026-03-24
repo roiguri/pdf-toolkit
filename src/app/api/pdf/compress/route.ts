@@ -1,12 +1,12 @@
 import { NextRequest } from 'next/server';
+import { verifyAuth } from '@/lib/verify-auth';
 
 const COMPRESS_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/compress';
 const VALID_LEVELS = ['screen', 'ebook', 'prepress'] as const;
 type CompressionLevel = typeof VALID_LEVELS[number];
 
 export async function POST(req: NextRequest) {
-  const apiKey = process.env.PDF_API_KEY;
-  if (!apiKey || req.headers.get('Authorization') !== `Bearer ${apiKey}`) {
+  if (!await verifyAuth(req)) {
     return Response.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

@@ -17,8 +17,7 @@ import { formatBytes } from '@/lib/utils';
 import { Download, RefreshCw, ArrowRight } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
-
-const COMPRESSOR_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/compress';
+import { useAuth } from '@/components/auth/AuthProvider';
 
 interface CompressedResult {
   url: string;
@@ -28,6 +27,7 @@ interface CompressedResult {
 }
 
 const CompressSidebar = () => {
+  const { currentUser } = useAuth();
   const {
     selectedFileId,
     files,
@@ -130,8 +130,10 @@ const CompressSidebar = () => {
       formData.append('file', fileBlob, selectedFile.name);
       formData.append('level', compressionLevel);
 
-      const compressResponse = await fetch(COMPRESSOR_API_URL, {
+      const idToken = await currentUser!.getIdToken();
+      const compressResponse = await fetch('/api/pdf/compress', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${idToken}` },
         body: formData,
         signal: controller.signal,
       });
