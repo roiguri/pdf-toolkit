@@ -4,7 +4,7 @@ import { Annotation, AnnotationType, Bookmark } from '@/services/firestore';
 // Re-export types
 export type { Annotation, AnnotationType, Bookmark };
 
-export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress';
+export type AppMode = 'view' | 'split' | 'merge' | 'convert' | 'edit' | 'compress' | 'scan';
 
 import { createFileSlice, FileSlice } from './slices/fileSlice';
 import { createNavigationSlice, NavigationSlice } from './slices/navigationSlice';

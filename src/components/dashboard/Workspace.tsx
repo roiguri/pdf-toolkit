@@ -10,6 +10,7 @@ import ConvertTool from './tools/ConvertTool';
 import SplitTool from './tools/SplitTool';
 import MergeTool from './tools/MergeTool';
 import CompressTool from './tools/CompressTool';
+import ScanTool from './tools/ScanTool';
 
 const Workspace = () => {
   const { selectedFileId, activeMode, files } = useAppStore();
@@ -41,6 +42,8 @@ const Workspace = () => {
         )}
 
         {activeMode === 'merge' && <MergeTool />}
+
+        {activeMode === 'scan' && <ScanTool />}
 
         {activeMode === 'compress' && (
           selectedFile ? <CompressTool file={selectedFile} /> : noFile('Select a PDF from the sidebar to compress.')

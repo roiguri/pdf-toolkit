@@ -20,6 +20,7 @@ import {
   Shrink,
   ChevronDown,
   Eye,
+  ScanLine,
 } from 'lucide-react';
 
 const ActionToolbar = () => {
@@ -46,6 +47,8 @@ const ActionToolbar = () => {
         return 'Edit';
       case 'compress':
         return 'Compress';
+      case 'scan':
+        return 'Scan';
       default:
         return 'Actions';
     }
@@ -62,6 +65,7 @@ const ActionToolbar = () => {
             {activeMode === 'convert' && <Image className="h-4 w-4" />}
             {activeMode === 'edit' && <PenLine className="h-4 w-4" />}
             {activeMode === 'compress' && <Shrink className="h-4 w-4" />}
+            {activeMode === 'scan' && <ScanLine className="h-4 w-4" />}
             {getActiveModeLabel()}
           </span>
           <ChevronDown className="h-4 w-4 opacity-50" />
@@ -92,6 +96,10 @@ const ActionToolbar = () => {
           <DropdownMenuRadioItem value="compress">
             <Shrink className="mr-2 h-4 w-4" />
             Compress
+          </DropdownMenuRadioItem>
+          <DropdownMenuRadioItem value="scan">
+            <ScanLine className="mr-2 h-4 w-4" />
+            Scan
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>
