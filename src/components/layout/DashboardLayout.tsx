@@ -178,7 +178,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="icon" className="rounded-full h-10 w-10">
           <Avatar>
-            <AvatarImage src={currentUser?.photoURL || '/placeholder-user.jpg'} alt="User Avatar" />
+            <AvatarImage src={currentUser?.photoURL || '/placeholder-user.jpg'} alt="User Avatar" referrerPolicy="no-referrer" />
             <AvatarFallback>{currentUser?.displayName?.charAt(0) || currentUser?.email?.charAt(0) || 'U'}</AvatarFallback>
           </Avatar>
           <span className="sr-only">Toggle user menu</span>
