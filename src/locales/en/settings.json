@@ -1,0 +1,31 @@
+{
+  "profile": "Profile",
+  "settings": "Settings",
+  "logout": "Log out",
+  "back": "Back",
+  "accountInfo": "Account Info",
+  "notSet": "Not set",
+  "joined": "Joined {{date}}",
+  "savedSignature": "Saved Signature",
+  "noSignature": "No saved signature",
+  "loadingSignature": "Loading signature...",
+  "deleteSignature": "Delete Signature",
+  "storage": "Storage",
+  "clearAllData": "Clear All Data",
+  "clearAllConfirm": {
+    "title": "Clear all data?",
+    "description": "This action cannot be undone. This will permanently delete all your PDF files{{filesInfo}} and clear all local storage.",
+    "filesInfo": " ({{count}} file)",
+    "filesInfo_plural": " ({{count}} files)",
+    "confirm": "Clear All"
+  },
+  "toasts": {
+    "signatureDeleted": "Signature deleted",
+    "signatureDeleteFailed": "Failed to delete signature",
+    "allDataCleared": "All data cleared successfully",
+    "clearDataFailed": "Failed to clear some data",
+    "nameEmpty": "Name cannot be empty",
+    "nameUpdated": "Display name updated",
+    "nameUpdateFailed": "Failed to update name"
+  }
+}

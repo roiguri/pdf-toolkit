@@ -10,6 +10,7 @@ import { FileMetadata } from '@/services/firestore';
 import { useAppStore } from '@/store/useAppStore';
 import MergeOrderList from '@/components/dashboard/MergeOrderList';
 import { mergePdfs, embedAnnotationsInPdf } from '@/lib/pdf-utils';
+import { useTranslation } from 'react-i18next';
 
 const downloadPdf = (bytes: Uint8Array, filename: string) => {
   const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
@@ -24,6 +25,7 @@ const downloadPdf = (bytes: Uint8Array, filename: string) => {
 
 const MergeTool = () => {
   const { files, mergeSelection } = useAppStore();
+  const { t } = useTranslation('tools');
 
   const filesToMerge = mergeSelection
     .map((id) => files.find((f) => f.id === id))
@@ -34,12 +36,12 @@ const MergeTool = () => {
 
   const handleMergePdfs = async () => {
     if (filesToMerge.length < 2) {
-      toast.error('Please select at least two PDF files to merge.');
+      toast.error(t('merge.toasts.selectTwo'));
       return;
     }
 
     setIsProcessing(true);
-    toast.info('Merging PDFs...', { id: 'pdf-processing' });
+    toast.info(t('merge.toasts.merging'), { id: 'pdf-processing' });
     try {
       const arrayBuffers = await Promise.all(
         filesToMerge.map(async (file) => {
@@ -67,10 +69,10 @@ const MergeTool = () => {
 
       const { bytes, filename } = await mergePdfs(arrayBuffers, 'merged_pdfs.pdf');
       downloadPdf(bytes, filename);
-      toast.success('PDFs merged successfully and downloaded!', { id: 'pdf-processing' });
+      toast.success(t('merge.toasts.success'), { id: 'pdf-processing' });
     } catch (error) {
       console.error('Error merging PDFs:', error);
-      toast.error(`Failed to merge PDFs: ${error instanceof Error ? error.message : String(error)}`, { id: 'pdf-processing' });
+      toast.error(t('merge.toasts.failed', { error: error instanceof Error ? error.message : String(error) }), { id: 'pdf-processing' });
     } finally {
       setIsProcessing(false);
     }
@@ -78,12 +80,12 @@ const MergeTool = () => {
 
   return (
     <div className="space-y-4">
-      <h3 className="text-lg font-semibold">Merge PDFs</h3>
+      <h3 className="text-lg font-semibold">{t('merge.title')}</h3>
       {filesToMerge.length > 0 ? (
         <div className="space-y-4">
           <div className="space-y-3">
             <p className="text-sm text-muted-foreground">
-              Drag to reorder ({filesToMerge.length} selected):
+              {t('merge.dragToReorder', { count: filesToMerge.length })}
             </p>
             <MergeOrderList files={filesToMerge} />
           </div>
@@ -95,16 +97,16 @@ const MergeTool = () => {
               disabled={isProcessing}
             />
             <Label htmlFor="include-highlights-merge" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-              Include Highlights
+              {t('merge.includeHighlights')}
             </Label>
           </div>
           <Button onClick={handleMergePdfs} disabled={isProcessing || filesToMerge.length < 2}>
-            {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Merge Selected PDFs
+            {isProcessing && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+            {t('merge.mergeButton')}
           </Button>
         </div>
       ) : (
-        <p className="text-center text-muted-foreground">Select at least two PDFs from the sidebar to merge.</p>
+        <p className="text-center text-muted-foreground">{t('merge.selectPrompt')}</p>
       )}
     </div>
   );

@@ -7,6 +7,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Loader2, Upload, ArrowLeft, ScanLine, PlusCircle } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
 
 type Corner = [number, number]; // [x, y] in original image coords
 
@@ -48,7 +49,7 @@ function Magnifier({ previewUrl, corner, origWidth, origHeight }: MagnifierProps
   const bgY = -(corner[1] * MAG_ZOOM - MAG_SIZE / 2);
   return (
     <div
-      className="absolute top-2 right-2 rounded-lg border-2 border-blue-500 overflow-hidden shadow-xl pointer-events-none"
+      className="absolute top-2 end-2 rounded-lg border-2 border-blue-500 overflow-hidden shadow-xl pointer-events-none"
       style={{
         width: MAG_SIZE,
         height: MAG_SIZE,
@@ -211,15 +212,16 @@ const ScanTool = () => {
   const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
   const currentIdx = images.length - 1; // index of the image being adjusted
   const current = images[currentIdx] ?? null;
+  const { t } = useTranslation('tools');
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
-      toast.error('Please select an image file.');
+      toast.error(t('scan.toasts.notImage'));
       return;
     }
 
     setIsDetecting(true);
-    toast.info('Detecting document edges…', { id: 'scan-detect' });
+    toast.info(t('scan.toasts.detecting'), { id: 'scan-detect' });
 
     const previewUrl = URL.createObjectURL(file);
 
@@ -251,13 +253,13 @@ const ScanTool = () => {
 
       setImages(prev => [...prev, { file, previewUrl, origWidth: dims.w, origHeight: dims.h, corners }]);
       setStep('adjust');
-      toast.success('Edges detected. Adjust corners if needed.', { id: 'scan-detect' });
+      toast.success(t('scan.toasts.detected'), { id: 'scan-detect' });
     } catch {
       // Fall back to full-image corners
       const corners: [Corner, Corner, Corner, Corner] = [[0, 0], [dims.w, 0], [dims.w, dims.h], [0, dims.h]];
       setImages(prev => [...prev, { file, previewUrl, origWidth: dims.w, origHeight: dims.h, corners }]);
       setStep('adjust');
-      toast.warning('Could not detect edges. Using full image.', { id: 'scan-detect' });
+      toast.warning(t('scan.toasts.detectFailed'), { id: 'scan-detect' });
     } finally {
       setIsDetecting(false);
     }
@@ -297,7 +299,7 @@ const ScanTool = () => {
   const handleScan = async () => {
     if (images.length === 0) return;
     setIsScanning(true);
-    toast.info('Scanning…', { id: 'scan-process' });
+    toast.info(t('scan.toasts.scanning'), { id: 'scan-process' });
 
     try {
       const form = new FormData();
@@ -318,14 +320,14 @@ const ScanTool = () => {
 
       const blob = await res.blob();
       downloadBlob(blob, 'scanned.pdf');
-      toast.success('PDF downloaded!', { id: 'scan-process' });
+      toast.success(t('scan.toasts.success'), { id: 'scan-process' });
 
       // Reset
       images.forEach(img => URL.revokeObjectURL(img.previewUrl));
       setImages([]);
       setStep('upload');
     } catch (err) {
-      toast.error(`Scan failed: ${err instanceof Error ? err.message : String(err)}`, { id: 'scan-process' });
+      toast.error(t('scan.toasts.failed', { error: err instanceof Error ? err.message : String(err) }), { id: 'scan-process' });
     } finally {
       setIsScanning(false);
     }
@@ -336,9 +338,9 @@ const ScanTool = () => {
   if (step === 'upload') {
     return (
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold">Scan Images to PDF</h3>
+        <h3 className="text-lg font-semibold">{t('scan.title')}</h3>
         {images.length > 0 && (
-          <p className="text-sm text-muted-foreground">{images.length} image(s) queued. Add another or go back to adjust.</p>
+          <p className="text-sm text-muted-foreground">{t('scan.queued', { count: images.length })}</p>
         )}
         <label
           className="flex flex-col items-center justify-center w-full h-48 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors"
@@ -351,7 +353,7 @@ const ScanTool = () => {
           ) : (
             <>
               <Upload className="h-8 w-8 text-muted-foreground mb-2" />
-              <span className="text-sm text-muted-foreground">Drop image here or click to upload</span>
+              <span className="text-sm text-muted-foreground">{t('scan.dropzone')}</span>
             </>
           )}
         </label>
@@ -362,18 +364,18 @@ const ScanTool = () => {
             checked={enhance}
             onCheckedChange={v => setEnhance(v === true)}
           />
-          <Label htmlFor="enhance-scan" className="text-sm">Enhance document (contrast)</Label>
+          <Label htmlFor="enhance-scan" className="text-sm">{t('scan.enhance')}</Label>
         </div>
 
         {images.length > 0 && (
           <div className="flex gap-2">
             <Button variant="outline" onClick={() => { setStep('adjust'); }}>
-              <ArrowLeft className="mr-2 h-4 w-4" /> Back to adjust
+              <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" /> {t('scan.backToAdjust')}
             </Button>
             <Button onClick={handleScan} disabled={isScanning}>
-              {isScanning && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              <ScanLine className="mr-2 h-4 w-4" />
-              Scan {images.length} image(s)
+              {isScanning && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+              <ScanLine className="me-2 h-4 w-4" />
+              {t('scan.scanButton', { count: images.length })}
             </Button>
           </div>
         )}
@@ -384,7 +386,7 @@ const ScanTool = () => {
   // step === 'adjust'
   return (
     <div className="space-y-4 flex flex-col h-full">
-      <h3 className="text-lg font-semibold">Adjust document corners</h3>
+      <h3 className="text-lg font-semibold">{t('scan.adjustTitle')}</h3>
 
       <div
         ref={setContainerEl}
@@ -415,16 +417,16 @@ const ScanTool = () => {
 
       <div className="flex gap-2 flex-shrink-0">
         <Button variant="outline" onClick={handleBack}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Back
+          <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" /> {t('scan.back', { ns: 'common' })}
         </Button>
         <Button variant="outline" onClick={handleAddAnother}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Add another image
+          <PlusCircle className="me-2 h-4 w-4" /> {t('scan.addAnother')}
         </Button>
         <Button onClick={handleScan} disabled={isScanning}>
           {isScanning
-            ? <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            : <ScanLine className="mr-2 h-4 w-4" />}
-          Scan {images.length} image(s)
+            ? <Loader2 className="me-2 h-4 w-4 animate-spin" />
+            : <ScanLine className="me-2 h-4 w-4" />}
+          {t('scan.scanButton', { count: images.length })}
         </Button>
       </div>
     </div>

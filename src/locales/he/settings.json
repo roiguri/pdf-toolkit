@@ -1,0 +1,31 @@
+{
+  "profile": "פרופיל",
+  "settings": "הגדרות",
+  "logout": "התנתק",
+  "back": "חזרה",
+  "accountInfo": "פרטי חשבון",
+  "notSet": "לא הוגדר",
+  "joined": "הצטרף {{date}}",
+  "savedSignature": "חתימה שמורה",
+  "noSignature": "אין חתימה שמורה",
+  "loadingSignature": "טוען חתימה...",
+  "deleteSignature": "מחק חתימה",
+  "storage": "אחסון",
+  "clearAllData": "נקה את כל הנתונים",
+  "clearAllConfirm": {
+    "title": "לנקות את כל הנתונים?",
+    "description": "לא ניתן לבטל פעולה זו. פעולה זו תמחק לצמיתות את כל קבצי ה-PDF שלך{{filesInfo}} ותנקה את כל האחסון המקומי.",
+    "filesInfo": " (קובץ {{count}})",
+    "filesInfo_plural": " ({{count}} קבצים)",
+    "confirm": "נקה הכל"
+  },
+  "toasts": {
+    "signatureDeleted": "החתימה נמחקה",
+    "signatureDeleteFailed": "מחיקת החתימה נכשלה",
+    "allDataCleared": "כל הנתונים נוקו בהצלחה",
+    "clearDataFailed": "ניקוי חלק מהנתונים נכשל",
+    "nameEmpty": "השם לא יכול להיות ריק",
+    "nameUpdated": "שם התצוגה עודכן",
+    "nameUpdateFailed": "עדכון השם נכשל"
+  }
+}

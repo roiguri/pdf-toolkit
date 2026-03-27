@@ -1,7 +1,7 @@
 // src/components/dashboard/CompressSidebar.tsx
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { useAppStore } from '@/store/useAppStore';
 import { toast } from 'sonner';
@@ -14,10 +14,11 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatBytes } from '@/lib/utils';
-import { Download, RefreshCw, ArrowRight } from 'lucide-react';
+import { Download, RefreshCw } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { useAuth } from '@/components/auth/AuthProvider';
+import { useTranslation } from 'react-i18next';
 
 interface CompressedResult {
   url: string;
@@ -37,6 +38,7 @@ const CompressSidebar = () => {
   } = useAppStore();
   const [compressionLevel, setCompressionLevel] = useState('ebook');
   const [compressedResult, setCompressedResult] = useState<CompressedResult | null>(null);
+  const { t } = useTranslation('tools');
 
   const selectedFile = files.find((f) => f.id === selectedFileId);
   const [includeHighlights, setIncludeHighlights] = useState(false);
@@ -69,30 +71,29 @@ const CompressSidebar = () => {
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => {
       window.removeEventListener('beforeunload', handleBeforeUnload);
-      // Optional: abort on unmount if desired, but for now we strictly handle window unload
     };
   }, [isCompressing]);
 
   const handleCancel = () => {
     if (compressAbortController) {
       compressAbortController.abort();
-      toast.info('Compression cancelled.');
+      toast.info(t('compress.toasts.cancelled'));
     }
   };
 
   const handleCompress = async () => {
     if (!selectedFileId || !selectedFile) {
-      toast.error('Please select a file to compress.');
+      toast.error(t('compress.toasts.selectFile'));
       return;
     }
 
     const controller = new AbortController();
     setCompressionStatus(true, controller);
-    toast.info('Compressing PDF...');
+    toast.info(t('compress.toasts.compressing'));
 
     try {
       if (!selectedFile.downloadURL) {
-        throw new Error('File download URL is missing');
+        throw new Error(t('compress.toasts.missingUrl'));
       }
 
       // Fetch the file from the download URL
@@ -102,7 +103,7 @@ const CompressSidebar = () => {
       // Embed annotations if present
       if (selectedFile.annotations?.length || selectedFile.bookmarks?.length) {
         try {
-          toast.info('Embedding annotations...', { id: 'compress-embedding' });
+          toast.info(t('compress.toasts.embeddingAnnotations'), { id: 'compress-embedding' });
           const arrayBuffer = await fileBlob.arrayBuffer();
 
           // Filter out highlights if not requested
@@ -119,10 +120,10 @@ const CompressSidebar = () => {
           );
 
           fileBlob = new Blob([annotatedBytes as any], { type: 'application/pdf' });
-          toast.success('Annotations embedded', { id: 'compress-embedding' });
+          toast.success(t('compress.toasts.annotationsEmbedded'), { id: 'compress-embedding' });
         } catch (embedError) {
           console.error('Error embedding annotations for compress:', embedError);
-          toast.error('Failed to embed annotations, proceeding with original file.', { id: 'compress-embedding' });
+          toast.error(t('compress.toasts.embedFailed'), { id: 'compress-embedding' });
         }
       }
 
@@ -139,7 +140,7 @@ const CompressSidebar = () => {
       });
 
       if (!compressResponse.ok) {
-        throw new Error('Failed to compress PDF.');
+        throw new Error(t('compress.toasts.failed'));
       }
 
       const compressedBlob = await compressResponse.blob();
@@ -152,14 +153,13 @@ const CompressSidebar = () => {
         originalSize: selectedFile.size || 0,
       });
 
-      toast.success('PDF compressed successfully!');
+      toast.success(t('compress.toasts.success'));
     } catch (error: any) {
       if (error.name === 'AbortError') {
-        // Already handled by toast in handleCancel, or we can log it
         console.log('Compression cancelled by user');
       } else {
         console.error('Compression error:', error);
-        toast.error('An error occurred during compression.');
+        toast.error(t('compress.toasts.error'));
       }
     } finally {
       setCompressionStatus(false, null);
@@ -188,21 +188,21 @@ const CompressSidebar = () => {
     return (
       <div className="space-y-6">
         <div className="rounded-lg border p-4 space-y-4 bg-muted/30">
-          <h3 className="font-medium">Compression Complete!</h3>
+          <h3 className="font-medium">{t('compress.result.title')}</h3>
 
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div>
-              <p className="text-muted-foreground">Original</p>
+              <p className="text-muted-foreground">{t('compress.result.original')}</p>
               <p className="font-medium">{formatBytes(compressedResult.originalSize)}</p>
             </div>
             <div>
-              <p className="text-muted-foreground">Compressed</p>
+              <p className="text-muted-foreground">{t('compress.result.compressed')}</p>
               <p className="font-medium">{formatBytes(compressedResult.size)}</p>
             </div>
           </div>
 
           <div className="pt-2 border-t">
-            <p className="text-sm text-muted-foreground mb-1">Reduction</p>
+            <p className="text-sm text-muted-foreground mb-1">{t('compress.result.reduction')}</p>
             <p className={`text-lg font-bold ${isPositiveReduction ? 'text-green-600' : 'text-orange-600'}`}>
               {isPositiveReduction ? '-' : '+'}{formatBytes(Math.abs(reduction))} ({reductionPercent}%)
             </p>
@@ -211,12 +211,12 @@ const CompressSidebar = () => {
 
         <div className="flex flex-col gap-2">
           <Button onClick={handleDownload} className="w-full">
-            <Download className="mr-2 h-4 w-4" />
-            Download File
+            <Download className="me-2 h-4 w-4" />
+            {t('compress.result.downloadButton')}
           </Button>
           <Button variant="outline" onClick={handleReset} className="w-full">
-            <RefreshCw className="mr-2 h-4 w-4" />
-            Compress Another
+            <RefreshCw className="me-2 h-4 w-4" />
+            {t('compress.result.compressAnotherButton')}
           </Button>
         </div>
       </div>
@@ -226,15 +226,15 @@ const CompressSidebar = () => {
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">
-        Select a compression level. Higher compression reduces file size but may lower quality.
+        {t('compress.selectPrompt')}
       </p>
 
       {selectedFile && (
         <div className="text-sm border rounded p-2 bg-muted/50">
-          <span className="text-muted-foreground">Selected: </span>
+          <span className="text-muted-foreground">{t('compress.selected')}: </span>
           <span className="font-medium">{selectedFile.name}</span>
           <span className="text-muted-foreground block text-xs mt-1">
-            Size: {formatBytes(selectedFile.size || 0)}
+            {t('compress.size')}: {formatBytes(selectedFile.size || 0)}
           </span>
         </div>
       )}
@@ -248,20 +248,20 @@ const CompressSidebar = () => {
           disabled={isCompressing || !selectedFile}
         />
         <Label htmlFor="include-highlights-compress" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-          Include Highlights
+          {t('compress.includeHighlights')}
         </Label>
       </div>
 
       <div>
-        <Label htmlFor="compression-level" className="mb-2">Compression Level</Label>
+        <Label htmlFor="compression-level" className="mb-2">{t('compress.levelLabel')}</Label>
         <Select value={compressionLevel} onValueChange={setCompressionLevel}>
           <SelectTrigger id="compression-level">
-            <SelectValue placeholder="Select level" />
+            <SelectValue placeholder={t('compress.levelPlaceholder')} />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="screen">High (Smallest size, 72 dpi)</SelectItem>
-            <SelectItem value="ebook">Medium (Average quality, 150 dpi)</SelectItem>
-            <SelectItem value="prepress">Low (Best quality, 300 dpi)</SelectItem>
+            <SelectItem value="screen">{t('compress.levels.screen')}</SelectItem>
+            <SelectItem value="ebook">{t('compress.levels.ebook')}</SelectItem>
+            <SelectItem value="prepress">{t('compress.levels.prepress')}</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -272,7 +272,7 @@ const CompressSidebar = () => {
           disabled={!selectedFileId || isCompressing}
           className="flex-1"
         >
-          {isCompressing ? 'Compressing...' : 'Compress PDF'}
+          {isCompressing ? t('compress.compressing') : t('compress.compressButton')}
         </Button>
 
         {isCompressing && (
@@ -280,7 +280,7 @@ const CompressSidebar = () => {
             variant="destructive"
             onClick={handleCancel}
           >
-            Cancel
+            {t('compress.cancelButton')}
           </Button>
         )}
       </div>

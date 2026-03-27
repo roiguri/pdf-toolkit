@@ -1,0 +1,75 @@
+{
+  "myPdfs": "ה-PDF שלי",
+  "workspace": "סביבת עבודה",
+  "newFolder": "תיקייה חדשה",
+  "backToRoot": "חזרה לשורש",
+  "dropzone": {
+    "idle": "גרור ושחרר קבצי PDF לכאן, או לחץ לבחירה",
+    "active": "שחרר את קבצי ה-PDF כאן ..."
+  },
+  "emptyFolder": "התיקייה ריקה.",
+  "noPdfs": "עדיין לא הועלו קבצי PDF.",
+  "pages": "{{count}}ע׳",
+  "createFolder": {
+    "title": "יצירת תיקייה חדשה",
+    "description": "הזן שם לתיקייה החדשה."
+  },
+  "rename": {
+    "file": "שנה שם קובץ",
+    "folder": "שנה שם תיקייה"
+  },
+  "move": {
+    "title": "העבר קובץ",
+    "description": "בחר תיקיית יעד.",
+    "root": "ה-PDF שלי (שורש)"
+  },
+  "deleteFile": {
+    "title": "מחיקת קובץ?",
+    "description": "למחוק לצמיתות את \"{{name}}\"?"
+  },
+  "deleteFolder": {
+    "title": "מחיקת תיקייה?",
+    "description": "למחוק לצמיתות את התיקייה \"{{name}}\" ואת כל {{count}} הפריטים בתוכה?"
+  },
+  "deleteAll": {
+    "title": "מחיקת כל הקבצים?",
+    "description": "לא ניתן לבטל פעולה זו. פעולה זו תמחק לצמיתות את כל {{count}} הפריטים מחשבונך.",
+    "confirm": "מחק הכל"
+  },
+  "selectNoFile": {
+    "view": "בחר קובץ PDF מהסרגל הצדדי לצפייה.",
+    "edit": "בחר קובץ PDF מהסרגל הצדדי לעריכה.",
+    "convert": "בחר קובץ PDF מהסרגל הצדדי להמרה.",
+    "split": "בחר קובץ PDF מהסרגל הצדדי לפיצול.",
+    "compress": "בחר קובץ PDF מהסרגל הצדדי לדחיסה."
+  },
+  "modes": {
+    "view": "צפייה",
+    "split": "פיצול",
+    "merge": "מיזוג",
+    "mergeCount": "מיזוג ({{count}})",
+    "convert": "המרה",
+    "edit": "עריכה",
+    "compress": "דחיסה",
+    "scan": "סריקה",
+    "actions": "פעולות"
+  },
+  "toasts": {
+    "notLoggedIn": "עליך להיות מחובר כדי להעלות קבצים.",
+    "notPdf": "הקובץ \"{{name}}\" אינו PDF ויידלג.",
+    "uploading": "מעלה את \"{{name}}\"...",
+    "uploadingProgress": "מעלה את \"{{name}}\": {{progress}}%",
+    "uploadSuccess": "\"{{name}}\" הועלה בהצלחה!",
+    "uploadFailed": "ההעלאה של \"{{name}}\" נכשלה.",
+    "pageCountFailed": "לא ניתן לקבוע את מספר העמודים עבור \"{{name}}\".",
+    "deleteSuccess": "\"{{name}}\" נמחק בהצלחה.",
+    "deleteFailed": "מחיקת \"{{name}}\" נכשלה.",
+    "deleteAllSuccess": "כל הקבצים נמחקו בהצלחה",
+    "deleteAllFailed": "מחיקת חלק מהקבצים נכשלה",
+    "folderDeleted": "התיקייה \"{{name}}\" ותכולתה נמחקו.",
+    "folderDeleteFailed": "מחיקת התיקייה ותכולתה נכשלה.",
+    "folderCreated": "התיקייה נוצרה",
+    "renamed": "שינוי השם בוצע בהצלחה",
+    "moved": "הקובץ הועבר"
+  }
+}

@@ -1,7 +1,8 @@
 // src/components/pdf/PDFViewer.tsx
 'use client';
 
-import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useState, useEffect, useRef, useCallback, forwardRef, useImperativeHandle, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Document, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -70,8 +71,7 @@ const DocumentLoading = (
   </div>
 );
 
-const DocumentNoData = <p>No PDF file selected or available.</p>;
-const DocumentError = <p>Failed to load PDF. Check CORS settings or file availability.</p>;
+// DocumentNoData and DocumentError are rendered inside the component using translations
 
 export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PDFViewer({
   file,
@@ -90,6 +90,10 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   onBookmarkSelect: onBookmarkSelectProp,
   onSignaturePlacementRequest: onSignaturePlacementRequestProp,
 }: PDFViewerProps, ref) {
+  const { t } = useTranslation('pdf-viewer');
+  const DocumentNoData = useMemo(() => <p>{t('noData')}</p>, [t]);
+  const DocumentError = useMemo(() => <p>{t('error')}</p>, [t]);
+
   const [numPages, setNumPages] = useState<number | null>(null);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
@@ -235,7 +239,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
       }
     } catch (error) {
       console.error('Fullscreen error:', error);
-      toast.error('Failed to toggle fullscreen');
+      toast.error(t('toasts.fullscreenFailed'));
     }
   }, []);
 
@@ -425,7 +429,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
 
     } catch (error) {
       console.error('Search error:', error);
-      toast.error('Failed to perform search');
+      toast.error(t('toasts.searchFailed'));
     } finally {
       setIsSearching(false);
     }
@@ -480,7 +484,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
         e.preventDefault();
         effectiveOnAnnotationDelete(effectiveSelectedAnnotationId);
         effectiveOnAnnotationSelect(null);
-        toast.success('Annotation deleted');
+        toast.success(t('toasts.annotationDeleted'));
       }
     };
 
@@ -506,11 +510,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
         <>
           {/* Controls toolbar */}
           <div className="flex flex-wrap items-center justify-center gap-2 w-full relative">
-            <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? 'Hide pages' : 'Show pages'}>
+            <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? t('hidePages') : t('showPages')}>
               {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
             </Button>
 
-            <Button onClick={toggleBookmarks} variant="outline" size="icon" title={showBookmarks ? 'Hide bookmarks' : 'Show bookmarks'}>
+            <Button onClick={toggleBookmarks} variant="outline" size="icon" title={showBookmarks ? t('hideBookmarks') : t('showBookmarks')}>
               <ScrollText className="h-4 w-4" />
             </Button>
 
@@ -518,7 +522,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
               onClick={() => setIsSearchOpen(!isSearchOpen)}
               variant={isSearchOpen ? "secondary" : "outline"}
               size="icon"
-              title="Search"
+              title={t('search')}
             >
               <Search className="h-4 w-4" />
             </Button>
@@ -539,7 +543,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
                         }
                       }
                     }}
-                    placeholder="Search text..."
+                    placeholder={t('searchPlaceholder')}
                     className="h-8"
                     autoFocus
                   />
@@ -579,26 +583,26 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
               onClick={() => effectiveOnBookmarkToggle(pageNumber)}
               variant={isBookmarked ? "default" : "outline"}
               size="icon"
-              title={isBookmarked ? "Remove bookmark" : "Bookmark this page"}
+              title={isBookmarked ? t('removeBookmark') : t('bookmarkPage')}
             >
               <BookmarkIcon className={`h-4 w-4 ${isBookmarked ? "fill-current" : ""}`} />
             </Button>
 
             {/* Zoom controls */}
             <div className="flex items-center gap-1 ml-2">
-              <Button onClick={zoomOut} disabled={scale <= MIN_SCALE} variant="outline" size="icon" title="Zoom out">
+              <Button onClick={zoomOut} disabled={scale <= MIN_SCALE} variant="outline" size="icon" title={t('zoomOut')}>
                 <ZoomOut className="h-4 w-4" />
               </Button>
               <span className="text-sm font-medium w-14 text-center">{Math.round(scale * 100)}%</span>
-              <Button onClick={zoomIn} disabled={scale >= MAX_SCALE} variant="outline" size="icon" title="Zoom in">
+              <Button onClick={zoomIn} disabled={scale >= MAX_SCALE} variant="outline" size="icon" title={t('zoomIn')}>
                 <ZoomIn className="h-4 w-4" />
               </Button>
-              <Button onClick={resetZoom} disabled={scale === 1} variant="outline" size="icon" title="Reset zoom">
+              <Button onClick={resetZoom} disabled={scale === 1} variant="outline" size="icon" title={t('resetZoom')}>
                 <RotateCcw className="h-4 w-4" />
               </Button>
             </div>
 
-            <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+            <Button onClick={toggleFullscreen} variant="outline" size="icon" title={isFullscreen ? t('exitFullscreen') : t('fullscreen')}>
               {isFullscreen ? <Minimize className="h-4 w-4" /> : <Maximize className="h-4 w-4" />}
             </Button>
           </div>

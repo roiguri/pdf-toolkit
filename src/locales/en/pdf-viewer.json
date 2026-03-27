@@ -1,0 +1,26 @@
+{
+  "noData": "No PDF file selected or available.",
+  "error": "Failed to load PDF. Check CORS settings or file availability.",
+  "showPages": "Show pages",
+  "hidePages": "Hide pages",
+  "showBookmarks": "Show bookmarks",
+  "hideBookmarks": "Hide bookmarks",
+  "search": "Search",
+  "searchPlaceholder": "Search text...",
+  "bookmarkPage": "Bookmark this page",
+  "removeBookmark": "Remove bookmark",
+  "zoomOut": "Zoom out",
+  "zoomIn": "Zoom in",
+  "resetZoom": "Reset zoom",
+  "fullscreen": "Fullscreen",
+  "exitFullscreen": "Exit fullscreen",
+  "annotations": "Annotations",
+  "noAnnotations": "No bookmarks or highlights.",
+  "noAnnotationsHint": "Mark pages or highlight text to see them here.",
+  "page": "Page {{number}}",
+  "toasts": {
+    "fullscreenFailed": "Failed to toggle fullscreen",
+    "searchFailed": "Failed to perform search",
+    "annotationDeleted": "Annotation deleted"
+  }
+}

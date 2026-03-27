@@ -45,6 +45,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { useTranslation } from 'react-i18next';
 
 // Helper Dialogs
 const CreateFolderDialog = ({
@@ -57,17 +58,18 @@ const CreateFolderDialog = ({
   onCreate: (name: string) => void;
 }) => {
   const [name, setName] = useState('');
+  const { t } = useTranslation(['dashboard', 'common']);
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Create New Folder</DialogTitle>
-          <DialogDescription>Enter a name for the new folder.</DialogDescription>
+          <DialogTitle>{t('createFolder.title')}</DialogTitle>
+          <DialogDescription>{t('createFolder.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Name
+            <Label htmlFor="name" className="text-end">
+              {t('common:name')}
             </Label>
             <Input
               id="name"
@@ -86,7 +88,7 @@ const CreateFolderDialog = ({
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
+            {t('common:cancel')}
           </Button>
           <Button
             onClick={() => {
@@ -97,7 +99,7 @@ const CreateFolderDialog = ({
             }}
             disabled={!name.trim()}
           >
-            Create
+            {t('common:create')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -119,6 +121,7 @@ const RenameDialog = ({
   type: 'file' | 'folder';
 }) => {
   const [name, setName] = useState(initialName);
+  const { t } = useTranslation(['dashboard', 'common']);
 
   useEffect(() => {
     if (open) setName(initialName);
@@ -128,12 +131,12 @@ const RenameDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Rename {type === 'folder' ? 'Folder' : 'File'}</DialogTitle>
+          <DialogTitle>{type === 'folder' ? t('rename.folder') : t('rename.file')}</DialogTitle>
         </DialogHeader>
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="rename-input" className="text-right">
-              Name
+            <Label htmlFor="rename-input" className="text-end">
+              {t('common:name')}
             </Label>
             <Input
               id="rename-input"
@@ -151,7 +154,7 @@ const RenameDialog = ({
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
+            {t('common:cancel')}
           </Button>
           <Button
             onClick={() => {
@@ -161,7 +164,7 @@ const RenameDialog = ({
             }}
             disabled={!name.trim() || name === initialName}
           >
-            Save
+            {t('common:save')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -183,24 +186,25 @@ const MoveDialog = ({
   currentFolderId: string | null;
 }) => {
   const [targetId, setTargetId] = useState<string | null>(currentFolderId || 'root');
+  const { t } = useTranslation(['dashboard', 'common']);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Move File</DialogTitle>
-          <DialogDescription>Select a destination folder.</DialogDescription>
+          <DialogTitle>{t('move.title')}</DialogTitle>
+          <DialogDescription>{t('move.description')}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-4 py-4 max-h-[300px] overflow-y-auto">
           <RadioGroup value={targetId ?? 'root'} onValueChange={(v) => setTargetId(v === 'root' ? null : v)}>
             <div className="flex items-center space-x-2">
               <RadioGroupItem value="root" id="r-root" disabled={currentFolderId === null} />
               <Label htmlFor="r-root" className="flex items-center gap-2">
-                <Folder className="h-4 w-4 text-muted-foreground" /> <span>My PDFs (Root)</span>
+                <Folder className="h-4 w-4 text-muted-foreground" /> <span>{t('move.root')}</span>
               </Label>
             </div>
             {folders.map(f => (
-              <div key={f.id} className="flex items-center space-x-2 ml-4">
+              <div key={f.id} className="flex items-center space-x-2 ms-4">
                 <RadioGroupItem value={f.id} id={`r-${f.id}`} disabled={currentFolderId === f.id} />
                 <Label htmlFor={`r-${f.id}`} className="flex items-center gap-2">
                   <Folder className="h-4 w-4 text-blue-500" /> <span>{f.name}</span>
@@ -211,13 +215,13 @@ const MoveDialog = ({
         </div>
         <DialogFooter>
           <Button onClick={() => onOpenChange(false)} variant="outline">
-            Cancel
+            {t('common:cancel')}
           </Button>
           <Button
             onClick={() => onMove(targetId === 'root' ? null : targetId)}
             disabled={targetId === (currentFolderId || 'root')}
           >
-            Move
+            {t('common:move')}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -243,6 +247,7 @@ const FileExplorer = () => {
   } = useAppStore();
   const [uploadingFiles, setUploadingFiles] = useState<{ [key: string]: number }>({}); // {fileName: progress}
   const [isDeletingAll, setIsDeletingAll] = useState(false);
+  const { t } = useTranslation(['dashboard', 'common']);
 
   // Dialog states
   const [isCreatingFolder, setIsCreatingFolder] = useState(false);
@@ -262,17 +267,17 @@ const FileExplorer = () => {
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       if (!currentUser?.uid) {
-        toast.error('You must be logged in to upload files.');
+        toast.error(t('toasts.notLoggedIn'));
         return;
       }
       for (const file of acceptedFiles) {
         if (file.type !== 'application/pdf') {
-          toast.error(`File "${file.name}" is not a PDF and will be skipped.`);
+          toast.error(t('toasts.notPdf', { name: file.name }));
           continue;
         }
 
         setUploadingFiles((prev) => ({ ...prev, [file.name]: 0 }));
-        toast.info(`Uploading "${file.name}"...`, { id: file.name, duration: 999999 });
+        toast.info(t('toasts.uploading', { name: file.name }), { id: file.name, duration: 999999 });
 
         try {
           const { storageRef, downloadURL } = await uploadPdfFile(
@@ -280,7 +285,7 @@ const FileExplorer = () => {
             file,
             (progress) => {
               setUploadingFiles((prev) => ({ ...prev, [file.name]: progress }));
-              toast.info(`Uploading "${file.name}": ${progress.toFixed(0)}%`, { id: file.name, duration: 999999 });
+              toast.info(t('toasts.uploadingProgress', { name: file.name, progress: progress.toFixed(0) }), { id: file.name, duration: 999999 });
             }
           );
 
@@ -291,7 +296,7 @@ const FileExplorer = () => {
             pageCount = await getPageCount(arrayBuffer);
           } catch (pageCountError) {
             console.error('Failed to get page count:', pageCountError);
-            toast.warning(`Could not determine page count for "${file.name}".`);
+            toast.warning(t('toasts.pageCountFailed', { name: file.name }));
           }
 
           const metadata = await addFileMetadata(currentUser.uid, {
@@ -305,7 +310,7 @@ const FileExplorer = () => {
           });
 
           // Update toast to success
-          toast.success(`"${file.name}" uploaded successfully!`, { id: file.name });
+          toast.success(t('toasts.uploadSuccess', { name: file.name }), { id: file.name });
 
           // If it's the first file, automatically select it
           if (!selectedFileId && files.length === 0) {
@@ -313,7 +318,7 @@ const FileExplorer = () => {
           }
         } catch (error) {
           console.error('Upload failed for', file.name, error);
-          toast.error(`Failed to upload "${file.name}".`, { id: file.name });
+          toast.error(t('toasts.uploadFailed', { name: file.name }), { id: file.name });
         } finally {
           setUploadingFiles((prev) => {
             const newState = { ...prev };
@@ -323,7 +328,7 @@ const FileExplorer = () => {
         }
       }
     },
-    [currentUser, selectedFileId, files.length, setSelectedFileId, setFiles, currentFolderId]
+    [currentUser, selectedFileId, files.length, setSelectedFileId, setFiles, currentFolderId, t]
   );
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({ onDrop });
@@ -333,12 +338,6 @@ const FileExplorer = () => {
 
     try {
       if (file.type === 'folder') {
-        // Recursive delete logic would go here if we were doing it clientside
-        // But for now, we'll just check if empty
-        const filesInFolder = files.filter(f => f.folderId === file.id);
-        if (filesInFolder.length > 0) {
-          // This case is handled by the specific delete dialog logic below
-        }
         await deleteFileMetadata(currentUser.uid, file.id);
       } else {
         // 1. Delete from Firebase Storage (only if it has one)
@@ -349,7 +348,7 @@ const FileExplorer = () => {
         await deleteFileMetadata(currentUser.uid, file.id);
       }
 
-      toast.success(`"${file.name}" deleted successfully.`);
+      toast.success(t('toasts.deleteSuccess', { name: file.name }));
 
       if (selectedFileId === file.id) {
         setSelectedFileId(null);
@@ -357,7 +356,7 @@ const FileExplorer = () => {
       removeFileFromMergeSelection(file.id);
     } catch (error) {
       console.error('Failed to delete item:', error);
-      toast.error(`Failed to delete "${file.name}".`);
+      toast.error(t('toasts.deleteFailed', { name: file.name }));
     }
   };
 
@@ -374,10 +373,10 @@ const FileExplorer = () => {
 
       // Delete the folder itself
       await deleteFileMetadata(currentUser.uid, folder.id);
-      toast.success(`Folder "${folder.name}" and contents deleted.`);
+      toast.success(t('toasts.folderDeleted', { name: folder.name }));
     } catch (error) {
       console.error("Recursive delete error", error);
-      toast.error("Failed to delete folder and contents.");
+      toast.error(t('toasts.folderDeleteFailed'));
     }
   };
 
@@ -394,10 +393,10 @@ const FileExplorer = () => {
       );
 
       reset();
-      toast.success('All files deleted successfully');
+      toast.success(t('toasts.deleteAllSuccess'));
     } catch (error) {
       console.error('Failed to delete all files:', error);
-      toast.error('Failed to delete some files');
+      toast.error(t('toasts.deleteAllFailed'));
     } finally {
       setIsDeletingAll(false);
     }
@@ -432,17 +431,17 @@ const FileExplorer = () => {
       <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between space-y-0 pb-2">
         <div className="flex items-center gap-2">
           {currentFolderId && (
-            <Button variant="ghost" size="icon" onClick={() => setCurrentFolderId(null)} title="Back to Root">
-              <ArrowLeft className="h-4 w-4" />
+            <Button variant="ghost" size="icon" onClick={() => setCurrentFolderId(null)} title={t('backToRoot')}>
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" />
             </Button>
           )}
-          <CardTitle>{currentFolder ? currentFolder.name : 'My PDFs'}</CardTitle>
+          <CardTitle>{currentFolder ? currentFolder.name : t('myPdfs')}</CardTitle>
         </div>
         <div className="flex items-center gap-1">
           {!currentFolderId && ( // Only allow folder creation at root (single level)
             <Button variant="outline" size="sm" onClick={() => setIsCreatingFolder(true)}>
-              <FolderPlus className="h-4 w-4 mr-1" />
-              New Folder
+              <FolderPlus className="h-4 w-4 me-1" />
+              {t('newFolder')}
             </Button>
           )}
           {files.length > 0 && !currentFolderId && ( // Delete All only at root
@@ -459,15 +458,15 @@ const FileExplorer = () => {
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Delete all files?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('deleteAll.title')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete all {files.length} items from your account.
+                    {t('deleteAll.description', { count: files.length })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleDeleteAllFiles}>
-                    Delete All
+                    {t('deleteAll.confirm')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -486,9 +485,9 @@ const FileExplorer = () => {
         >
           <input {...getInputProps()} />
           {isDragActive ? (
-            <p className="px-4 text-center text-sm">Drop the PDFs here ...</p>
+            <p className="px-4 text-center text-sm">{t('dropzone.active')}</p>
           ) : (
-            <p className="px-4 text-center text-sm">Drag &apos;n&apos; drop PDFs here, or click to select</p>
+            <p className="px-4 text-center text-sm">{t('dropzone.idle')}</p>
           )}
         </div>
 
@@ -506,7 +505,7 @@ const FileExplorer = () => {
         <div className="flex-grow overflow-y-auto rounded-md border p-2 max-h-[30vh] sm:max-h-none">
           {filteredFiles.length === 0 ? (
             <p className="p-4 text-center text-muted-foreground">
-              {currentFolderId ? 'Folder is empty.' : 'No PDFs uploaded yet.'}
+              {currentFolderId ? t('emptyFolder') : t('noPdfs')}
             </p>
           ) : (
             <div className="space-y-2">
@@ -548,8 +547,8 @@ const FileExplorer = () => {
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
                     {file.type !== 'folder' && file.pageCount && (
-                      <span className="text-xs text-muted-foreground whitespace-nowrap mr-2">
-                        {file.pageCount}p
+                      <span className="text-xs text-muted-foreground whitespace-nowrap me-2">
+                        {t('pages', { count: file.pageCount })}
                       </span>
                     )}
 
@@ -575,11 +574,11 @@ const FileExplorer = () => {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setItemToRename({ id: file.id, name: file.name, type: file.type as 'file' | 'folder' }); }}>
-                          <Edit className="mr-2 h-4 w-4" /> Rename
+                          <Edit className="me-2 h-4 w-4" /> {t('common:rename')}
                         </DropdownMenuItem>
                         {file.type !== 'folder' && (
                           <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setFileToMove(file); }}>
-                            <Move className="mr-2 h-4 w-4" /> Move
+                            <Move className="me-2 h-4 w-4" /> {t('common:move')}
                           </DropdownMenuItem>
                         )}
                         <DropdownMenuSeparator />
@@ -590,7 +589,7 @@ const FileExplorer = () => {
                           }}
                           className="text-red-600 focus:text-red-600 focus:bg-red-50"
                         >
-                          <Trash2 className="mr-2 h-4 w-4" /> Delete
+                          <Trash2 className="me-2 h-4 w-4" /> {t('common:delete')}
                         </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
@@ -608,7 +607,7 @@ const FileExplorer = () => {
         onCreate={async (name) => {
           if (currentUser) {
             await createFolder(currentUser.uid, name, currentFolderId);
-            toast.success('Folder created');
+            toast.success(t('toasts.folderCreated'));
             setIsCreatingFolder(false);
           }
         }}
@@ -623,7 +622,7 @@ const FileExplorer = () => {
           onRename={async (newName) => {
             if (currentUser && itemToRename) {
               await renameFileMetadata(currentUser.uid, itemToRename.id, newName);
-              toast.success('Renamed successfully');
+              toast.success(t('toasts.renamed'));
               setItemToRename(null);
             }
           }}
@@ -639,7 +638,7 @@ const FileExplorer = () => {
           onMove={async (targetId) => {
             if (currentUser && fileToMove) {
               await moveFile(currentUser.uid, fileToMove.id, targetId);
-              toast.success('File moved');
+              toast.success(t('toasts.moved'));
               setFileToMove(null);
             }
           }}
@@ -650,17 +649,17 @@ const FileExplorer = () => {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {itemToDelete?.type === 'folder' ? 'Delete folder?' : 'Delete file?'}
+              {itemToDelete?.type === 'folder' ? t('deleteFolder.title') : t('deleteFile.title')}
             </AlertDialogTitle>
             <AlertDialogDescription>
               {itemToDelete?.type === 'folder'
-                ? `Permanently delete folder "${itemToDelete.name}" and all ${files.filter(f => f.folderId === itemToDelete.id).length} items inside?`
-                : `Permanently delete "${itemToDelete?.name}"?`
+                ? t('deleteFolder.description', { name: itemToDelete.name, count: files.filter(f => f.folderId === itemToDelete.id).length })
+                : t('deleteFile.description', { name: itemToDelete?.name })
               }
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>{t('common:cancel')}</AlertDialogCancel>
             <AlertDialogAction
               className="bg-red-600 hover:bg-red-700"
               onClick={() => {
@@ -674,7 +673,7 @@ const FileExplorer = () => {
                 }
               }}
             >
-              Delete
+              {t('common:delete')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

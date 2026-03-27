@@ -22,9 +22,11 @@ import {
   Eye,
   ScanLine,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 const ActionToolbar = () => {
   const { setActiveMode, activeMode, mergeSelection, clearMergeSelection } = useAppStore();
+  const { t } = useTranslation('dashboard');
 
   const handleModeChange = (mode: AppMode) => {
     setActiveMode(mode);
@@ -36,21 +38,23 @@ const ActionToolbar = () => {
   const getActiveModeLabel = () => {
     switch (activeMode) {
       case 'view':
-        return 'View';
+        return t('modes.view');
       case 'split':
-        return 'Split';
+        return t('modes.split');
       case 'merge':
-        return `Merge (${mergeSelection.length})`;
+        return mergeSelection.length > 0
+          ? t('modes.mergeCount', { count: mergeSelection.length })
+          : t('modes.merge');
       case 'convert':
-        return 'Convert';
+        return t('modes.convert');
       case 'edit':
-        return 'Edit';
+        return t('modes.edit');
       case 'compress':
-        return 'Compress';
+        return t('modes.compress');
       case 'scan':
-        return 'Scan';
+        return t('modes.scan');
       default:
-        return 'Actions';
+        return t('modes.actions');
     }
   };
 
@@ -74,32 +78,32 @@ const ActionToolbar = () => {
       <DropdownMenuContent className="w-[200px]" align="start">
         <DropdownMenuRadioGroup value={activeMode} onValueChange={(value) => handleModeChange(value as AppMode)}>
           <DropdownMenuRadioItem value="view">
-            <Eye className="mr-2 h-4 w-4" />
-            View
+            <Eye className="me-2 h-4 w-4" />
+            {t('modes.view')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="split">
-            <SplitSquareVertical className="mr-2 h-4 w-4" />
-            Split
+            <SplitSquareVertical className="me-2 h-4 w-4" />
+            {t('modes.split')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="merge">
-            <Combine className="mr-2 h-4 w-4" />
-            Merge {mergeSelection.length > 0 && `(${mergeSelection.length})`}
+            <Combine className="me-2 h-4 w-4" />
+            {t('modes.merge')} {mergeSelection.length > 0 && `(${mergeSelection.length})`}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="convert">
-            <Image className="mr-2 h-4 w-4" />
-            Convert
+            <Image className="me-2 h-4 w-4" />
+            {t('modes.convert')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="edit">
-            <PenLine className="mr-2 h-4 w-4" />
-            Edit
+            <PenLine className="me-2 h-4 w-4" />
+            {t('modes.edit')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="compress">
-            <Shrink className="mr-2 h-4 w-4" />
-            Compress
+            <Shrink className="me-2 h-4 w-4" />
+            {t('modes.compress')}
           </DropdownMenuRadioItem>
           <DropdownMenuRadioItem value="scan">
-            <ScanLine className="mr-2 h-4 w-4" />
-            Scan
+            <ScanLine className="me-2 h-4 w-4" />
+            {t('modes.scan')}
           </DropdownMenuRadioItem>
         </DropdownMenuRadioGroup>
       </DropdownMenuContent>

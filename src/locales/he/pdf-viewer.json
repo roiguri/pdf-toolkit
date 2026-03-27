@@ -1,0 +1,26 @@
+{
+  "noData": "לא נבחר קובץ PDF או שאינו זמין.",
+  "error": "טעינת ה-PDF נכשלה. בדוק הגדרות CORS או זמינות הקובץ.",
+  "showPages": "הצג עמודים",
+  "hidePages": "הסתר עמודים",
+  "showBookmarks": "הצג סימניות",
+  "hideBookmarks": "הסתר סימניות",
+  "search": "חיפוש",
+  "searchPlaceholder": "חפש טקסט...",
+  "bookmarkPage": "הוסף סימנייה לעמוד",
+  "removeBookmark": "הסר סימנייה",
+  "zoomOut": "הקטן",
+  "zoomIn": "הגדל",
+  "resetZoom": "איפוס זום",
+  "fullscreen": "מסך מלא",
+  "exitFullscreen": "יציאה ממסך מלא",
+  "annotations": "הערות",
+  "noAnnotations": "אין סימניות או הדגשות.",
+  "noAnnotationsHint": "סמן עמודים או הדגש טקסט כדי לראות אותם כאן.",
+  "page": "עמוד {{number}}",
+  "toasts": {
+    "fullscreenFailed": "מעבר למסך מלא נכשל",
+    "searchFailed": "החיפוש נכשל",
+    "annotationDeleted": "ההערה נמחקה"
+  }
+}

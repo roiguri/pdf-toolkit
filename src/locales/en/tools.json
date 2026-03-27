@@ -1,0 +1,112 @@
+{
+  "split": {
+    "title": "Split PDF:",
+    "pageRangesLabel": "Page Ranges (e.g., 1, 3-5, 7):",
+    "pageRangesPlaceholder": "e.g., 1, 3-5, 7",
+    "includeHighlights": "Include Highlights",
+    "splitButton": "Split PDF",
+    "toasts": {
+      "missingRanges": "Please enter page ranges to split.",
+      "missingUrl": "File URL is missing: cannot split.",
+      "splitting": "Splitting PDF...",
+      "embeddingAnnotations": "Embedding annotations...",
+      "success": "PDF split successfully and downloaded!",
+      "failed": "Failed to split PDF: {{error}}"
+    }
+  },
+  "merge": {
+    "title": "Merge PDFs",
+    "dragToReorder": "Drag to reorder ({{count}} selected):",
+    "includeHighlights": "Include Highlights",
+    "mergeButton": "Merge Selected PDFs",
+    "selectPrompt": "Select at least two PDFs from the sidebar to merge.",
+    "toasts": {
+      "selectTwo": "Please select at least two PDF files to merge.",
+      "merging": "Merging PDFs...",
+      "success": "PDFs merged successfully and downloaded!",
+      "failed": "Failed to merge PDFs: {{error}}"
+    }
+  },
+  "convert": {
+    "includeHighlights": "Include Highlights",
+    "convertButton": "Convert to Image",
+    "toasts": {
+      "pageNotFound": "Current page not found.",
+      "rendering": "Page rendering not complete. Please wait a moment.",
+      "converting": "Converting page to image...",
+      "success": "Page converted and downloaded as image!",
+      "failed": "Failed to convert page to image."
+    }
+  },
+  "compress": {
+    "title": "Compress PDF:",
+    "selectPrompt": "Select a compression level. Higher compression reduces file size but may lower quality.",
+    "selected": "Selected",
+    "size": "Size",
+    "includeHighlights": "Include Highlights",
+    "levelLabel": "Compression Level",
+    "levelPlaceholder": "Select level",
+    "levels": {
+      "screen": "High (Smallest size, 72 dpi)",
+      "ebook": "Medium (Average quality, 150 dpi)",
+      "prepress": "Low (Best quality, 300 dpi)"
+    },
+    "compressButton": "Compress PDF",
+    "compressing": "Compressing...",
+    "cancelButton": "Cancel",
+    "result": {
+      "title": "Compression Complete!",
+      "original": "Original",
+      "compressed": "Compressed",
+      "reduction": "Reduction",
+      "downloadButton": "Download File",
+      "compressAnotherButton": "Compress Another"
+    },
+    "toasts": {
+      "selectFile": "Please select a file to compress.",
+      "missingUrl": "File download URL is missing",
+      "compressing": "Compressing PDF...",
+      "embeddingAnnotations": "Embedding annotations...",
+      "annotationsEmbedded": "Annotations embedded",
+      "embedFailed": "Failed to embed annotations, proceeding with original file.",
+      "success": "PDF compressed successfully!",
+      "failed": "Failed to compress PDF.",
+      "error": "An error occurred during compression.",
+      "cancelled": "Compression cancelled."
+    }
+  },
+  "scan": {
+    "title": "Scan Images to PDF",
+    "adjustTitle": "Adjust document corners",
+    "queued": "{{count}} image(s) queued. Add another or go back to adjust.",
+    "dropzone": "Drop image here or click to upload",
+    "enhance": "Enhance document (contrast)",
+    "backToAdjust": "Back to adjust",
+    "scanButton": "Scan {{count}} image(s)",
+    "addAnother": "Add another image",
+    "toasts": {
+      "notImage": "Please select an image file.",
+      "detecting": "Detecting document edges…",
+      "detected": "Edges detected. Adjust corners if needed.",
+      "detectFailed": "Could not detect edges. Using full image.",
+      "scanning": "Scanning…",
+      "success": "PDF downloaded!",
+      "failed": "Scan failed: {{error}}"
+    }
+  },
+  "edit": {
+    "signature": "Signature",
+    "includeHighlights": "Include Highlights",
+    "clearSignatures": "Clear Signatures",
+    "export": "Export",
+    "toasts": {
+      "signatureSaved": "Signature saved to profile",
+      "signatureFailed": "Failed to save signature to profile",
+      "noAnnotations": "No annotations or bookmarks to export",
+      "exporting": "Exporting PDF...",
+      "exportSuccess": "PDF exported successfully!",
+      "exportFailed": "Failed to export PDF with annotations",
+      "annotationDeleted": "Annotation deleted"
+    }
+  }
+}

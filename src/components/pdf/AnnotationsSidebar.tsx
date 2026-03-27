@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollText, Trash2, Highlighter, Edit2, Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 interface AnnotationsSidebarProps {
   onScrollToPage: (page: number) => void;
@@ -26,6 +27,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
     setSelectedBookmarkId,
     setSelectedAnnotationId
   } = useAppStore();
+  const { t } = useTranslation('pdf-viewer');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState('');
@@ -60,10 +62,10 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
 
   if (items.length === 0) {
     return (
-      <div className="w-72 border-l bg-background p-4 flex flex-col items-center justify-center text-muted-foreground h-full">
+      <div className="w-72 border-s bg-background p-4 flex flex-col items-center justify-center text-muted-foreground h-full">
         <ScrollText className="h-12 w-12 mb-2 opacity-50" />
-        <p className="text-sm text-center">No bookmarks or highlights.</p>
-        <p className="text-xs text-center mt-1">Mark pages or highlight text to see them here.</p>
+        <p className="text-sm text-center">{t('noAnnotations')}</p>
+        <p className="text-xs text-center mt-1">{t('noAnnotationsHint')}</p>
       </div>
     );
   }
@@ -104,10 +106,10 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
   };
 
   return (
-    <div className="w-72 border-l bg-background flex flex-col h-full">
+    <div className="w-72 border-s bg-background flex flex-col h-full">
       <div className="p-3 border-b font-medium flex items-center gap-2">
         <ScrollText className="h-4 w-4" />
-        Annotations
+        {t('annotations')}
       </div>
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {items.map((item) => {
@@ -139,7 +141,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
                       style={{ color: item.data.style?.color || '#eab308' }} // Default yellow-600
                     />
                   )}
-                  Page {item.data.pageNumber}
+                  {t('page', { number: item.data.pageNumber })}
                 </div>
                 {!isEditing && (
                   <div className="flex items-center opacity-0 group-hover:opacity-100 transition-opacity">

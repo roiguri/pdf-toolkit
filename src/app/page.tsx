@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { FirebaseError } from 'firebase/app';
+import { useTranslation } from 'react-i18next';
 
 export default function LoginPage() {
   const { currentUser, loading, signInWithGoogle, signIn } = useAuth();
@@ -18,6 +19,7 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSigningIn, setIsSigningIn] = useState(false);
+  const { t } = useTranslation('auth');
 
   useEffect(() => {
     if (!loading && currentUser) {
@@ -30,15 +32,15 @@ export default function LoginPage() {
       error.code === 'auth/blocking-function-error' ||
       (error.code === 'auth/internal-error' && error.message.includes('not invited'))
     )) {
-      toast.error('Access denied. You are not invited to use this application.');
+      toast.error(t('errors.notInvited'));
     } else if (error instanceof FirebaseError && error.code === 'auth/wrong-password') {
-      toast.error('Incorrect password.');
+      toast.error(t('errors.wrongPassword'));
     } else if (error instanceof FirebaseError && error.code === 'auth/user-not-found') {
-      toast.error('No account found with this email.');
+      toast.error(t('errors.userNotFound'));
     } else if (error instanceof FirebaseError && error.code === 'auth/popup-closed-by-user') {
       // User dismissed the popup — no toast needed
     } else {
-      toast.error('Sign-in failed. Please try again.');
+      toast.error(t('errors.signInFailed'));
     }
   };
 
@@ -56,7 +58,7 @@ export default function LoginPage() {
   const handleEmailSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!email || !password) {
-      toast.error('Please enter both email and password.');
+      toast.error(t('errors.missingFields'));
       return;
     }
     setIsSigningIn(true);
@@ -81,15 +83,15 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl">Sign In</CardTitle>
+          <CardTitle className="text-2xl">{t('signIn')}</CardTitle>
           <CardDescription>
-            Choose your preferred method to sign in to the PDF Toolkit.
+            {t('description')}
           </CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4">
           <Button variant="outline" className="w-full" onClick={handleGoogleSignIn} disabled={isSigningIn}>
-            {isSigningIn ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Sign in with Google
+            {isSigningIn ? <Loader2 className="me-2 h-4 w-4 animate-spin" /> : null}
+            {t('signInWithGoogle')}
           </Button>
           <div className="relative">
             <div className="absolute inset-0 flex items-center">
@@ -97,24 +99,24 @@ export default function LoginPage() {
             </div>
             <div className="relative flex justify-center text-xs uppercase">
               <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
+                {t('orContinueWith')}
               </span>
             </div>
           </div>
           <form onSubmit={handleEmailSignIn} className="grid gap-4">
             <div className="grid gap-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="email">{t('email')}</Label>
               <Input
                 id="email"
                 type="email"
-                placeholder="m@example.com"
+                placeholder={t('emailPlaceholder')}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={isSigningIn}
               />
             </div>
             <div className="grid gap-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">{t('password')}</Label>
               <Input
                 id="password"
                 type="password"
@@ -124,8 +126,8 @@ export default function LoginPage() {
               />
             </div>
             <Button className="w-full" type="submit" disabled={isSigningIn}>
-              {isSigningIn && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Sign In
+              {isSigningIn && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+              {t('signIn')}
             </Button>
           </form>
         </CardContent>

@@ -1,0 +1,75 @@
+{
+  "myPdfs": "My PDFs",
+  "workspace": "Workspace",
+  "newFolder": "New Folder",
+  "backToRoot": "Back to Root",
+  "dropzone": {
+    "idle": "Drag 'n' drop PDFs here, or click to select",
+    "active": "Drop the PDFs here ..."
+  },
+  "emptyFolder": "Folder is empty.",
+  "noPdfs": "No PDFs uploaded yet.",
+  "pages": "{{count}}p",
+  "createFolder": {
+    "title": "Create New Folder",
+    "description": "Enter a name for the new folder."
+  },
+  "rename": {
+    "file": "Rename File",
+    "folder": "Rename Folder"
+  },
+  "move": {
+    "title": "Move File",
+    "description": "Select a destination folder.",
+    "root": "My PDFs (Root)"
+  },
+  "deleteFile": {
+    "title": "Delete file?",
+    "description": "Permanently delete \"{{name}}\"?"
+  },
+  "deleteFolder": {
+    "title": "Delete folder?",
+    "description": "Permanently delete folder \"{{name}}\" and all {{count}} items inside?"
+  },
+  "deleteAll": {
+    "title": "Delete all files?",
+    "description": "This action cannot be undone. This will permanently delete all {{count}} items from your account.",
+    "confirm": "Delete All"
+  },
+  "selectNoFile": {
+    "view": "Select a PDF from the sidebar to view.",
+    "edit": "Select a PDF from the sidebar to edit.",
+    "convert": "Select a PDF from the sidebar to convert.",
+    "split": "Select a PDF from the sidebar to split.",
+    "compress": "Select a PDF from the sidebar to compress."
+  },
+  "modes": {
+    "view": "View",
+    "split": "Split",
+    "merge": "Merge",
+    "mergeCount": "Merge ({{count}})",
+    "convert": "Convert",
+    "edit": "Edit",
+    "compress": "Compress",
+    "scan": "Scan",
+    "actions": "Actions"
+  },
+  "toasts": {
+    "notLoggedIn": "You must be logged in to upload files.",
+    "notPdf": "File \"{{name}}\" is not a PDF and will be skipped.",
+    "uploading": "Uploading \"{{name}}\"...",
+    "uploadingProgress": "Uploading \"{{name}}\": {{progress}}%",
+    "uploadSuccess": "\"{{name}}\" uploaded successfully!",
+    "uploadFailed": "Failed to upload \"{{name}}\".",
+    "pageCountFailed": "Could not determine page count for \"{{name}}\".",
+    "deleteSuccess": "\"{{name}}\" deleted successfully.",
+    "deleteFailed": "Failed to delete \"{{name}}\".",
+    "deleteAllSuccess": "All files deleted successfully",
+    "deleteAllFailed": "Failed to delete some files",
+    "folderDeleted": "Folder \"{{name}}\" and contents deleted.",
+    "folderDeleteFailed": "Failed to delete folder and contents.",
+    "folderCreated": "Folder created",
+    "renamed": "Renamed successfully",
+    "moved": "File moved"
+  }
+}

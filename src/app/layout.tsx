@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/layout/theme-provider';
 import { AuthProvider } from '@/components/auth/AuthProvider';
 import { Toaster } from '@/components/ui/sonner';
 import { ServiceWorkerRegistration } from '@/components/pwa/ServiceWorkerRegistration';
+import { LocaleProvider } from '@/components/layout/LocaleProvider';
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -49,9 +50,11 @@ export default function RootLayout({
             enableSystem
             disableTransitionOnChange
           >
-            {children}
-            <Toaster />
-            <ServiceWorkerRegistration />
+            <LocaleProvider>
+              {children}
+              <Toaster />
+              <ServiceWorkerRegistration />
+            </LocaleProvider>
           </ThemeProvider>
         </AuthProvider>
       </body>

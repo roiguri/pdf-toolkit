@@ -11,6 +11,7 @@ import { FileMetadata } from '@/services/firestore';
 import { useAppStore } from '@/store/useAppStore';
 import { PDFViewer, PDFViewerHandle } from '@/components/pdf/PDFViewer';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
+import { useTranslation } from 'react-i18next';
 
 interface ConvertToolProps {
   file: FileMetadata;
@@ -19,6 +20,7 @@ interface ConvertToolProps {
 const ConvertTool = ({ file }: ConvertToolProps) => {
   const viewerRef = useRef<PDFViewerHandle>(null);
   const { annotations } = useAppStore();
+  const { t } = useTranslation('tools');
 
   const [isConverting, setIsConverting] = useState(false);
   const [includeHighlights, setIncludeHighlights] = useState(false);
@@ -28,7 +30,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
     const pageEl = viewerRef.current?.getPageElement(currentPage);
 
     if (!pageEl) {
-      toast.error('Current page not found.');
+      toast.error(t('convert.toasts.pageNotFound'));
       return;
     }
 
@@ -38,7 +40,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
     const shouldBurn = hasSignaturesOrText || (hasHighlights && includeHighlights);
 
     setIsConverting(true);
-    toast.info('Converting page to image...', { id: 'image-conversion' });
+    toast.info(t('convert.toasts.converting'), { id: 'image-conversion' });
 
     try {
       let imageDataUrl: string;
@@ -78,7 +80,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
       } else {
         const canvas = pageEl.querySelector('canvas');
         if (!canvas) {
-          toast.error('Page rendering not complete. Please wait a moment.');
+          toast.error(t('convert.toasts.rendering'));
           return;
         }
         imageDataUrl = canvas.toDataURL('image/png', 1.0);
@@ -90,10 +92,10 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      toast.success('Page converted and downloaded as image!', { id: 'image-conversion' });
+      toast.success(t('convert.toasts.success'), { id: 'image-conversion' });
     } catch (error) {
       console.error('Error converting page to image:', error);
-      toast.error('Failed to convert page to image.', { id: 'image-conversion' });
+      toast.error(t('convert.toasts.failed'), { id: 'image-conversion' });
     } finally {
       setIsConverting(false);
     }
@@ -110,13 +112,13 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
             disabled={isConverting}
           />
           <Label htmlFor="include-highlights-convert" className="text-sm font-medium cursor-pointer">
-            Include Highlights
+            {t('convert.includeHighlights')}
           </Label>
         </div>
         <Button onClick={handleDownloadImage} disabled={isConverting} variant="outline">
-          {isConverting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          <ImageIcon className="mr-2 h-4 w-4" />
-          Convert to Image
+          {isConverting && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+          <ImageIcon className="me-2 h-4 w-4" />
+          {t('convert.convertButton')}
         </Button>
       </div>
 

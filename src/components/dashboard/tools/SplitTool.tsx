@@ -11,6 +11,7 @@ import { FileMetadata } from '@/services/firestore';
 import { PDFViewer } from '@/components/pdf/PDFViewer';
 import { useAppStore } from '@/store/useAppStore';
 import { splitPdf, embedAnnotationsInPdf } from '@/lib/pdf-utils';
+import { useTranslation } from 'react-i18next';
 
 const downloadPdf = (bytes: Uint8Array, filename: string) => {
   const blob = new Blob([bytes as BlobPart], { type: 'application/pdf' });
@@ -32,24 +33,25 @@ const SplitTool = ({ file }: SplitToolProps) => {
   const [splitPageRanges, setSplitPageRanges] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
   const [includeHighlights, setIncludeHighlights] = useState(false);
+  const { t } = useTranslation('tools');
 
   const handleSplitPdf = async () => {
     if (!splitPageRanges) {
-      toast.error('Please enter page ranges to split.');
+      toast.error(t('split.toasts.missingRanges'));
       return;
     }
     if (!file.downloadURL) {
-      toast.error('File URL is missing: cannot split.');
+      toast.error(t('split.toasts.missingUrl'));
       return;
     }
 
     setIsProcessing(true);
-    toast.info('Splitting PDF...', { id: 'pdf-processing' });
+    toast.info(t('split.toasts.splitting'), { id: 'pdf-processing' });
     try {
       let arrayBuffer = await fetch(file.downloadURL).then((res) => res.arrayBuffer());
 
       if (file.annotations?.length || file.bookmarks?.length) {
-        toast.info('Embedding annotations...', { id: 'pdf-processing' });
+        toast.info(t('split.toasts.embeddingAnnotations'), { id: 'pdf-processing' });
         const filteredAnnotations = (file.annotations || []).filter(a =>
           a.type === 'signature' || a.type === 'text' ||
           (includeHighlights && a.type === 'highlight')
@@ -65,11 +67,11 @@ const SplitTool = ({ file }: SplitToolProps) => {
 
       const output = await splitPdf(arrayBuffer, splitPageRanges, file.name);
       output.forEach(({ bytes, filename }) => downloadPdf(bytes, filename));
-      toast.success('PDF split successfully and downloaded!', { id: 'pdf-processing' });
+      toast.success(t('split.toasts.success'), { id: 'pdf-processing' });
       setSplitPageRanges('');
     } catch (error) {
       console.error('Error splitting PDF:', error);
-      toast.error(`Failed to split PDF: ${error instanceof Error ? error.message : String(error)}`, { id: 'pdf-processing' });
+      toast.error(t('split.toasts.failed', { error: error instanceof Error ? error.message : String(error) }), { id: 'pdf-processing' });
     } finally {
       setIsProcessing(false);
     }
@@ -78,18 +80,18 @@ const SplitTool = ({ file }: SplitToolProps) => {
   return (
     <div className="flex flex-col h-full space-y-4">
       <h3 className="text-lg font-semibold flex min-w-0">
-        <span className="flex-shrink-0">Split PDF:&nbsp;</span>
+        <span className="flex-shrink-0">{t('split.title')}&nbsp;</span>
         <span className="truncate">{file.name}</span>
       </h3>
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="page-ranges">Page Ranges (e.g., 1, 3-5, 7):</Label>
+          <Label htmlFor="page-ranges">{t('split.pageRangesLabel')}</Label>
           <Input
             id="page-ranges"
             type="text"
             value={splitPageRanges}
             onChange={(e) => setSplitPageRanges(e.target.value)}
-            placeholder="e.g., 1, 3-5, 7"
+            placeholder={t('split.pageRangesPlaceholder')}
             disabled={isProcessing}
           />
         </div>
@@ -101,12 +103,12 @@ const SplitTool = ({ file }: SplitToolProps) => {
             disabled={isProcessing}
           />
           <Label htmlFor="include-highlights-split" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-            Include Highlights
+            {t('split.includeHighlights')}
           </Label>
         </div>
         <Button onClick={handleSplitPdf} disabled={isProcessing}>
-          {isProcessing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Split PDF
+          {isProcessing && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
+          {t('split.splitButton')}
         </Button>
       </div>
       <div className="flex-1 min-h-0">

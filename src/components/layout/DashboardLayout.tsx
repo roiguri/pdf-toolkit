@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAuth } from '@/components/auth/AuthProvider';
 import { ModeToggle } from './ModeToggle';
+import { LocaleToggle } from './LocaleToggle';
 import { FileText, Settings, LogOut, User, Calendar, Mail, Trash2, ArrowLeft, Pencil, Check, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
@@ -32,6 +33,7 @@ import {
 import { useAppStore } from '@/store/useAppStore';
 import { deletePdfFile } from '@/services/storage';
 import { deleteFileMetadata } from '@/services/firestore';
+import { useTranslation } from 'react-i18next';
 
 type MenuView = 'main' | 'profile' | 'settings';
 
@@ -45,6 +47,7 @@ import { deleteUserSignature, subscribeToUserSignature, UserSignature } from '@/
 const SignatureManager = ({ currentUser }: { currentUser: { uid: string } | null }) => {
   const [signature, setSignature] = useState<UserSignature | null>(null);
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation('settings');
 
   React.useEffect(() => {
     if (currentUser?.uid) {
@@ -61,16 +64,16 @@ const SignatureManager = ({ currentUser }: { currentUser: { uid: string } | null
     try {
       await deleteUserSignature(currentUser.uid);
       setSignature(null);
-      toast.success('Signature deleted');
+      toast.success(t('toasts.signatureDeleted'));
     } catch (error) {
-      toast.error('Failed to delete signature');
+      toast.error(t('toasts.signatureDeleteFailed'));
     }
   };
 
-  if (loading) return <div className="text-xs text-muted-foreground">Loading signature...</div>;
+  if (loading) return <div className="text-xs text-muted-foreground">{t('loadingSignature')}</div>;
 
   if (!signature) {
-    return <div className="text-xs text-muted-foreground italic">No saved signature</div>;
+    return <div className="text-xs text-muted-foreground italic">{t('noSignature')}</div>;
   }
 
   return (
@@ -88,8 +91,8 @@ const SignatureManager = ({ currentUser }: { currentUser: { uid: string } | null
         onClick={handleDelete}
         className="w-full h-7 text-xs"
       >
-        <Trash2 className="mr-2 h-3 w-3" />
-        Delete Signature
+        <Trash2 className="me-2 h-3 w-3" />
+        {t('deleteSignature')}
       </Button>
     </div>
   );
@@ -97,14 +100,15 @@ const SignatureManager = ({ currentUser }: { currentUser: { uid: string } | null
 
 const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
   const { currentUser, logout, updateDisplayName } = useAuth();
-  const { files, reset } = useAppStore();
+  const { files, reset, locale } = useAppStore();
   const [menuView, setMenuView] = useState<MenuView>('main');
   const [isEditingName, setIsEditingName] = useState(false);
   const [editedName, setEditedName] = useState('');
+  const { t } = useTranslation('settings');
 
   const formatDate = (date: string | undefined) => {
     if (!date) return 'Unknown';
-    return new Intl.DateTimeFormat('en-US', {
+    return new Intl.DateTimeFormat(locale === 'he' ? 'he-IL' : 'en-US', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -128,14 +132,16 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       // Reset app state
       reset();
 
-      // Clear browser storage
+      // Clear browser storage (preserve locale preference)
+      const savedLocale = localStorage.getItem('locale');
       localStorage.clear();
       sessionStorage.clear();
+      if (savedLocale) localStorage.setItem('locale', savedLocale);
 
-      toast.success('All data cleared successfully');
+      toast.success(t('toasts.allDataCleared'));
     } catch (error) {
       console.error('Failed to clear data:', error);
-      toast.error('Failed to clear some data');
+      toast.error(t('toasts.clearDataFailed'));
     }
   };
 
@@ -146,15 +152,15 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
 
   const handleSaveName = async () => {
     if (!editedName.trim()) {
-      toast.error('Name cannot be empty');
+      toast.error(t('toasts.nameEmpty'));
       return;
     }
     try {
       await updateDisplayName(editedName.trim());
-      toast.success('Display name updated');
+      toast.success(t('toasts.nameUpdated'));
       setIsEditingName(false);
     } catch {
-      toast.error('Failed to update name');
+      toast.error(t('toasts.nameUpdateFailed'));
     }
   };
 
@@ -162,6 +168,10 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
     setIsEditingName(false);
     setEditedName('');
   };
+
+  const filesInfo = files.length > 0
+    ? t('clearAllConfirm.filesInfo', { count: files.length, count_plural: files.length })
+    : '';
 
   const renderUserMenu = (side: "right" | "bottom" | "top" | "left", align: "end" | "start" | "center" = "end") => (
     <DropdownMenu onOpenChange={(open) => !open && setMenuView('main')}>
@@ -187,17 +197,17 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('profile'); }}>
-              <User className="mr-2 h-4 w-4" />
-              <span>Profile</span>
+              <User className="me-2 h-4 w-4" />
+              <span>{t('profile')}</span>
             </DropdownMenuItem>
             <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('settings'); }}>
-              <Settings className="mr-2 h-4 w-4" />
-              <span>Settings</span>
+              <Settings className="me-2 h-4 w-4" />
+              <span>{t('settings')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={logout} className="text-red-600">
-              <LogOut className="mr-2 h-4 w-4" />
-              <span>Log out</span>
+              <LogOut className="me-2 h-4 w-4" />
+              <span>{t('logout')}</span>
             </DropdownMenuItem>
           </>
         )}
@@ -205,11 +215,11 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
         {menuView === 'profile' && (
           <>
             <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('main'); setIsEditingName(false); }}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              <span>Back</span>
+              <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
+              <span>{t('back')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Account Info</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('accountInfo')}</DropdownMenuLabel>
             <div className="px-2 py-1.5 text-sm">
               <div className="flex items-center gap-2 mb-2">
                 <User className="h-4 w-4 text-muted-foreground flex-shrink-0" />
@@ -235,9 +245,9 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
                 ) : (
                   <div className="flex items-center gap-1 flex-1">
                     <span className="text-muted-foreground">
-                      {currentUser?.displayName || 'Not set'}
+                      {currentUser?.displayName || t('notSet')}
                     </span>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 ml-auto" onClick={handleStartEditName}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 ms-auto" onClick={handleStartEditName}>
                       <Pencil className="h-3 w-3" />
                     </Button>
                   </div>
@@ -252,13 +262,13 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
               <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-muted-foreground" />
                 <span className="text-muted-foreground">
-                  Joined {formatDate(currentUser?.metadata?.creationTime)}
+                  {t('joined', { date: formatDate(currentUser?.metadata?.creationTime) })}
                 </span>
               </div>
             </div>
 
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Saved Signature</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('savedSignature')}</DropdownMenuLabel>
             <div className="px-2 py-1.5">
               <SignatureManager currentUser={currentUser} />
             </div>
@@ -268,30 +278,29 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
         {menuView === 'settings' && (
           <>
             <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setMenuView('main'); }}>
-              <ArrowLeft className="mr-2 h-4 w-4" />
-              <span>Back</span>
+              <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" />
+              <span>{t('back')}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuLabel>Storage</DropdownMenuLabel>
+            <DropdownMenuLabel>{t('storage')}</DropdownMenuLabel>
             <AlertDialog>
               <AlertDialogTrigger asChild>
                 <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-red-600">
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  <span>Clear All Data</span>
+                  <Trash2 className="me-2 h-4 w-4" />
+                  <span>{t('clearAllData')}</span>
                 </DropdownMenuItem>
               </AlertDialogTrigger>
               <AlertDialogContent>
                 <AlertDialogHeader>
-                  <AlertDialogTitle>Clear all data?</AlertDialogTitle>
+                  <AlertDialogTitle>{t('clearAllConfirm.title')}</AlertDialogTitle>
                   <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete all your PDF files
-                    {files.length > 0 ? ` (${files.length} file${files.length !== 1 ? 's' : ''})` : ''} and clear all local storage.
+                    {t('clearAllConfirm.description', { filesInfo })}
                   </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogCancel>{t('cancel', { ns: 'common' })}</AlertDialogCancel>
                   <AlertDialogAction onClick={handleClearAllData}>
-                    Clear All
+                    {t('clearAllConfirm.confirm')}
                   </AlertDialogAction>
                 </AlertDialogFooter>
               </AlertDialogContent>
@@ -319,6 +328,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
 
           {/* Mobile Only: Right side controls */}
           <div className="flex items-center gap-2 sm:hidden">
+            <LocaleToggle side="bottom" align="end" />
             <ModeToggle side="bottom" align="end" />
             {renderUserMenu("bottom", "end")}
           </div>
@@ -326,6 +336,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
 
         {/* Desktop Only: Bottom Controls */}
         <nav className="mt-auto hidden flex-col items-center gap-4 px-2 sm:flex py-4">
+          <LocaleToggle side="left" align="end" />
           <ModeToggle side="left" align="end" />
           {renderUserMenu("right", "end")}
         </nav>

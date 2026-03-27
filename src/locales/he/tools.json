@@ -1,0 +1,112 @@
+{
+  "split": {
+    "title": "פיצול PDF:",
+    "pageRangesLabel": "טווחי עמודים (למשל, 1, 3-5, 7):",
+    "pageRangesPlaceholder": "למשל, 1, 3-5, 7",
+    "includeHighlights": "כלול הדגשות",
+    "splitButton": "פצל PDF",
+    "toasts": {
+      "missingRanges": "יש להזין טווחי עמודים לפיצול.",
+      "missingUrl": "כתובת הקובץ חסרה: לא ניתן לפצל.",
+      "splitting": "מפצל PDF...",
+      "embeddingAnnotations": "מטמיע הערות...",
+      "success": "ה-PDF פוצל בהצלחה והורד!",
+      "failed": "פיצול ה-PDF נכשל: {{error}}"
+    }
+  },
+  "merge": {
+    "title": "מיזוג קבצי PDF",
+    "dragToReorder": "גרור לסידור מחדש ({{count}} נבחרו):",
+    "includeHighlights": "כלול הדגשות",
+    "mergeButton": "מזג קבצי PDF נבחרים",
+    "selectPrompt": "בחר לפחות שני קבצי PDF מהסרגל הצדדי למיזוג.",
+    "toasts": {
+      "selectTwo": "יש לבחור לפחות שני קבצי PDF למיזוג.",
+      "merging": "ממזג קבצי PDF...",
+      "success": "קבצי ה-PDF מוזגו בהצלחה והורדו!",
+      "failed": "מיזוג קבצי ה-PDF נכשל: {{error}}"
+    }
+  },
+  "convert": {
+    "includeHighlights": "כלול הדגשות",
+    "convertButton": "המר לתמונה",
+    "toasts": {
+      "pageNotFound": "העמוד הנוכחי לא נמצא.",
+      "rendering": "עיבוד העמוד לא הושלם. המתן רגע.",
+      "converting": "ממיר עמוד לתמונה...",
+      "success": "העמוד הומר והורד כתמונה!",
+      "failed": "המרת העמוד לתמונה נכשלה."
+    }
+  },
+  "compress": {
+    "title": "דחיסת PDF:",
+    "selectPrompt": "בחר רמת דחיסה. דחיסה גבוהה יותר מקטינה את גודל הקובץ אך עלולה להוריד את האיכות.",
+    "selected": "נבחר",
+    "size": "גודל",
+    "includeHighlights": "כלול הדגשות",
+    "levelLabel": "רמת דחיסה",
+    "levelPlaceholder": "בחר רמה",
+    "levels": {
+      "screen": "גבוהה (גודל מינימלי, 72 dpi)",
+      "ebook": "בינונית (איכות ממוצעת, 150 dpi)",
+      "prepress": "נמוכה (איכות מיטבית, 300 dpi)"
+    },
+    "compressButton": "דחוס PDF",
+    "compressing": "דוחס...",
+    "cancelButton": "ביטול",
+    "result": {
+      "title": "הדחיסה הושלמה!",
+      "original": "מקורי",
+      "compressed": "דחוס",
+      "reduction": "הפחתה",
+      "downloadButton": "הורד קובץ",
+      "compressAnotherButton": "דחוס קובץ נוסף"
+    },
+    "toasts": {
+      "selectFile": "יש לבחור קובץ לדחיסה.",
+      "missingUrl": "כתובת הורדת הקובץ חסרה",
+      "compressing": "דוחס PDF...",
+      "embeddingAnnotations": "מטמיע הערות...",
+      "annotationsEmbedded": "ההערות הוטמעו",
+      "embedFailed": "הטמעת ההערות נכשלה, ממשיך עם הקובץ המקורי.",
+      "success": "ה-PDF נדחס בהצלחה!",
+      "failed": "דחיסת ה-PDF נכשלה.",
+      "error": "אירעה שגיאה בעת הדחיסה.",
+      "cancelled": "הדחיסה בוטלה."
+    }
+  },
+  "scan": {
+    "title": "סריקת תמונות ל-PDF",
+    "adjustTitle": "כוונן פינות מסמך",
+    "queued": "{{count}} תמונה/ות בתור. הוסף עוד או חזור לכוונון.",
+    "dropzone": "שחרר תמונה כאן או לחץ להעלאה",
+    "enhance": "שפר מסמך (ניגודיות)",
+    "backToAdjust": "חזרה לכוונון",
+    "scanButton": "סרוק {{count}} תמונה/ות",
+    "addAnother": "הוסף תמונה נוספת",
+    "toasts": {
+      "notImage": "יש לבחור קובץ תמונה.",
+      "detecting": "מזהה קצות מסמך…",
+      "detected": "הקצות זוהו. כוונן פינות במידת הצורך.",
+      "detectFailed": "לא ניתן לזהות קצות. משתמש בתמונה מלאה.",
+      "scanning": "סורק…",
+      "success": "ה-PDF הורד!",
+      "failed": "הסריקה נכשלה: {{error}}"
+    }
+  },
+  "edit": {
+    "signature": "חתימה",
+    "includeHighlights": "כלול הדגשות",
+    "clearSignatures": "נקה חתימות",
+    "export": "ייצא",
+    "toasts": {
+      "signatureSaved": "החתימה נשמרה בפרופיל",
+      "signatureFailed": "שמירת החתימה בפרופיל נכשלה",
+      "noAnnotations": "אין הערות או סימניות לייצוא",
+      "exporting": "מייצא PDF...",
+      "exportSuccess": "ה-PDF יוצא בהצלחה!",
+      "exportFailed": "ייצוא ה-PDF עם הערות נכשל",
+      "annotationDeleted": "ההערה נמחקה"
+    }
+  }
+}

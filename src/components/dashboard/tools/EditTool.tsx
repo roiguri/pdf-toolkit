@@ -10,6 +10,7 @@ import EditToolbar from '@/components/pdf/EditToolbar';
 import SignatureModal from '@/components/pdf/SignatureModal';
 import { embedAnnotationsInPdf } from '@/lib/pdf-utils';
 import { usePdfPersistence } from '@/hooks/usePdfPersistence';
+import { useTranslation } from 'react-i18next';
 
 interface EditToolProps {
   file: FileMetadata;
@@ -20,6 +21,7 @@ const EditTool = ({ file }: EditToolProps) => {
 
   const viewerRef = useRef<PDFViewerHandle>(null);
   const { currentUser } = useAuth();
+  const { t } = useTranslation('tools');
 
   const {
     annotations,
@@ -77,11 +79,11 @@ const EditTool = ({ file }: EditToolProps) => {
     if (saveToProfile && currentUser) {
       try {
         await saveUserSignature(currentUser.uid, signatureDataUrl, width, height);
-        toast.success('Signature saved to profile');
+        toast.success(t('edit.toasts.signatureSaved'));
         setSavedSignature({ id: 'default', dataUrl: signatureDataUrl, width, height, updatedAt: new Date() });
       } catch (error) {
         console.error('Error saving signature:', error);
-        toast.error('Failed to save signature to profile');
+        toast.error(t('edit.toasts.signatureFailed'));
       }
     }
 
@@ -116,16 +118,16 @@ const EditTool = ({ file }: EditToolProps) => {
 
     setPendingSignaturePosition(null);
     setPendingSignaturePage(null);
-  }, [pendingSignaturePosition, pendingSignaturePage, addAnnotation, currentUser]);
+  }, [pendingSignaturePosition, pendingSignaturePage, addAnnotation, currentUser, t]);
 
   const handleExportWithAnnotations = useCallback(async () => {
     if (annotations.length === 0 && bookmarks.length === 0) {
-      toast.info('No annotations or bookmarks to export');
+      toast.info(t('edit.toasts.noAnnotations'));
       return;
     }
 
     try {
-      toast.info('Exporting PDF...', { id: 'export-pdf' });
+      toast.info(t('edit.toasts.exporting'), { id: 'export-pdf' });
 
       const pagesDimensions = viewerRef.current?.pagesDimensions ?? {};
       const scale = viewerRef.current?.scale ?? 1;
@@ -161,12 +163,12 @@ const EditTool = ({ file }: EditToolProps) => {
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      toast.success('PDF exported successfully!', { id: 'export-pdf' });
+      toast.success(t('edit.toasts.exportSuccess'), { id: 'export-pdf' });
     } catch (error) {
       console.error('Error exporting PDF:', error);
-      toast.error('Failed to export PDF with annotations', { id: 'export-pdf' });
+      toast.error(t('edit.toasts.exportFailed'), { id: 'export-pdf' });
     }
-  }, [annotations, bookmarks, file, includeHighlights]);
+  }, [annotations, bookmarks, file, includeHighlights, t]);
 
   return (
     <>

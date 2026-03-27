@@ -10,8 +10,10 @@ import { createFileSlice, FileSlice } from './slices/fileSlice';
 import { createNavigationSlice, NavigationSlice } from './slices/navigationSlice';
 import { createAnnotationSlice, AnnotationSlice } from './slices/annotationSlice';
 import { createCompressionSlice, CompressionSlice } from './slices/compressionSlice';
+import { createLocaleSlice, LocaleSlice } from './slices/localeSlice';
+export type { Locale } from './slices/localeSlice';
 
-export type AppState = FileSlice & NavigationSlice & AnnotationSlice & CompressionSlice & {
+export type AppState = FileSlice & NavigationSlice & AnnotationSlice & CompressionSlice & LocaleSlice & {
   reset: () => void;
 };
 
@@ -35,6 +37,7 @@ export const useAppStore = create<AppState>()((set, get, store) => ({
   ...createNavigationSlice(set, get, store),
   ...createAnnotationSlice(set, get, store),
   ...createCompressionSlice(set, get, store),
+  ...createLocaleSlice(set, get, store),
 
   reset: () => set(initialState),
 }));
