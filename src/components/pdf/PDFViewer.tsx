@@ -95,6 +95,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   const DocumentError = useMemo(() => <p>{t('error')}</p>, [t]);
 
   const [numPages, setNumPages] = useState<number | null>(null);
+  const [thumbnailsReady, setThumbnailsReady] = useState(false);
   const [pageNumber, setPageNumber] = useState<number>(1);
   const [inputValue, setInputValue] = useState<string>('1');
   const [containerWidth, setContainerWidth] = useState<number | undefined>(undefined);
@@ -282,10 +283,11 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
     return () => resizeObserver.disconnect();
   }, []);
 
-  // Reset zoom when file changes
+  // Reset zoom and thumbnail state when file changes
   useEffect(() => {
     setScale(1);
     setPagesDimensions({});
+    setThumbnailsReady(false);
   }, [file.id]);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -620,27 +622,29 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             {/* Thumbnails */}
             {showThumbnails && (
               <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
-                <Document file={file.downloadURL} loading={null}>
-                  {Array.from({ length: numPages || 0 }, (_, index) => (
+                <Document file={file.downloadURL} loading={null} onLoadSuccess={() => setThumbnailsReady(true)}>
+                  {thumbnailsReady && Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
                       key={index + 1}
                       onClick={() => scrollToPage(index + 1)}
-                      className={`w-full p-1 rounded border-2 transition-colors ${pageNumber === index + 1
+                      className={`w-full p-1 rounded border-2 transition-colors overflow-hidden ${pageNumber === index + 1
                         ? 'border-primary bg-primary/10'
                         : 'border-transparent hover:border-muted-foreground/30'
                         }`}
                     >
-                      <Page
-                        pageNumber={index + 1}
-                        width={92}
-                        renderTextLayer={false}
-                        renderAnnotationLayer={false}
-                        loading={
-                          <div className="h-28 flex items-center justify-center">
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          </div>
-                        }
-                      />
+                      <div className="w-full overflow-hidden flex justify-center">
+                        <Page
+                          pageNumber={index + 1}
+                          width={92}
+                          renderTextLayer={false}
+                          renderAnnotationLayer={false}
+                          loading={
+                            <div className="h-28 flex items-center justify-center">
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            </div>
+                          }
+                        />
+                      </div>
                       <span className="text-xs text-muted-foreground">{index + 1}</span>
                     </button>
                   ))}
