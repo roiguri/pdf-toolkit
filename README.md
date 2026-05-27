@@ -2,6 +2,8 @@
 
 A modern web application for managing and manipulating PDF files. Built with Next.js, Firebase, and pdf-lib.
 
+> **Note:** This app is invite-only — access is gated to an authenticated allowlist. There is no public live demo link.
+
 ## Features
 
 - **User Authentication** - Secure sign-in with Google or email/password via Firebase Auth
@@ -34,8 +36,8 @@ A modern web application for managing and manipulating PDF files. Built with Nex
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/pdf-tools.git
-   cd pdf-tools
+   git clone https://github.com/roiguri/pdf-toolkit.git
+   cd pdf-toolkit
    ```
 
 2. **Install dependencies**
@@ -76,6 +78,32 @@ A modern web application for managing and manipulating PDF files. Built with Nex
    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
    ```
 
+4. **Set up the Python compression service** (optional for local dev)
+
+   The PDF compression feature is powered by a separate Python service in `python-compressor/`, deployed on Cloud Run with IAM authentication. For local development you can either:
+   - Deploy your own Cloud Run instance following `python-compressor/DEPLOY_INSTRUCTIONS.md`, or
+   - Stub out / skip the compression call entirely.
+
+5. **Run the development server**
+   ```bash
+   npm run dev
+   # or
+   yarn dev
+   # or
+   pnpm dev
+   ```
+
+6. **Open the application**
+
+   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
+
+### Building for Production
+
+```bash
+npm run build
+npm start
+```
+
 ## Security
 
 This application implements proper multi-user security:
@@ -105,26 +133,6 @@ match /uploads/{userId}/{allPaths=**} {
 ```
 
 These rules ensure that User A cannot access User B's files - Firebase enforces this at the database level.
-
-4. **Run the development server**
-   ```bash
-   npm run dev
-   # or
-   yarn dev
-   # or
-   pnpm dev
-   ```
-
-5. **Open the application**
-
-   Navigate to [http://localhost:3000](http://localhost:3000) in your browser.
-
-### Building for Production
-
-```bash
-npm run build
-npm start
-```
 
 ## Usage
 
