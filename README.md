@@ -10,11 +10,13 @@ A modern web application for managing and manipulating PDF files. Built with Nex
 - **Cloud Storage** - Store and manage your PDF files in the cloud with Firebase Storage
 - **PDF Viewer** - Preview PDF documents directly in the browser
 - **Split PDF** - Extract specific pages or page ranges from a PDF (e.g., "1, 3-5, 7")
-- **Merge PDFs** - Combine multiple PDF files into a single document
+- **Merge PDFs** - Combine multiple PDF files into a single document, with reorderable pages
+- **Compress PDF** - Reduce file size with selectable quality levels
+- **Edit PDF** - Add highlights, text annotations, signatures, and bookmarks
+- **Scan to PDF** - Capture images and convert them to scanned PDFs with corner adjustment
 - **Convert to Image** - Export PDF pages as images
 - **File Explorer** - Organize and browse your uploaded PDFs
-- **Dark/Light Theme** - Toggle between dark and light modes
-- **Responsive Design** - Works on desktop and mobile devices
+- **PWA Support** - Installable as a Progressive Web App with offline capabilities
 
 ## Tech Stack
 
@@ -157,7 +159,3 @@ src/
 ├── services/           # Firebase services (Firestore, Storage)
 └── store/              # Zustand state management
 ```
-
-## License
-
-This project is private.
