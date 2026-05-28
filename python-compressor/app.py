@@ -1,18 +1,41 @@
 from flask import Flask, request, send_file
-from flask_cors import CORS
 import subprocess
 import os
 import uuid
 import io
+from functools import wraps
 import numpy as np
 import cv2
 from PIL import Image
 import img2pdf
+from google.oauth2 import id_token
+from google.auth.transport import requests as g_requests
 
 app = Flask(__name__)
-CORS(app)
+
+CLOUD_RUN_AUDIENCE = os.environ['CLOUD_RUN_AUDIENCE']
+INVOKER_SA_EMAIL = os.environ['INVOKER_SA_EMAIL']
+_token_request = g_requests.Request()
+
+
+def require_auth(f):
+    @wraps(f)
+    def wrapper(*args, **kwargs):
+        header = request.headers.get('Authorization', '')
+        if not header.startswith('Bearer '):
+            return 'Unauthorized', 401
+        try:
+            claims = id_token.verify_oauth2_token(
+                header[7:], _token_request, CLOUD_RUN_AUDIENCE)
+        except Exception:
+            return 'Unauthorized', 401
+        if claims.get('email') != INVOKER_SA_EMAIL or not claims.get('email_verified'):
+            return 'Forbidden', 403
+        return f(*args, **kwargs)
+    return wrapper
 
 @app.route('/compress', methods=['POST'])
+@require_auth
 def compress_pdf():
     if 'file' not in request.files:
         return 'No file part', 400
@@ -53,6 +76,7 @@ def compress_pdf():
             os.remove(output_path)
 
 @app.route('/render', methods=['POST'])
+@require_auth
 def render_pdf_page():
     if 'file' not in request.files:
         return 'No file part', 400
@@ -455,6 +479,7 @@ def _img_to_jpeg_bytes(img_array):
 
 
 @app.route('/detect', methods=['POST'])
+@require_auth
 def detect_document():
     """
     Return detected document corners as JSON.
@@ -479,6 +504,7 @@ def detect_document():
 
 
 @app.route('/scan', methods=['POST'])
+@require_auth
 def scan_images():
     """
     Convert one or more images to a scanned PDF.

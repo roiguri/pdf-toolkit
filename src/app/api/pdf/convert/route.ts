@@ -1,6 +1,5 @@
 import { NextRequest } from 'next/server';
-
-const RENDER_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/render';
+import { compressorAuthHeader, compressorUrl } from '@/lib/cloudRunAuth';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.PDF_API_KEY;
@@ -31,7 +30,12 @@ export async function POST(req: NextRequest) {
     upstream.append('file', file);
     upstream.append('page', String(page));
 
-    const response = await fetch(RENDER_API_URL, { method: 'POST', body: upstream });
+    const authHeader = await compressorAuthHeader();
+    const response = await fetch(compressorUrl('/render'), {
+      method: 'POST',
+      headers: authHeader,
+      body: upstream,
+    });
 
     if (!response.ok) {
       const text = await response.text();

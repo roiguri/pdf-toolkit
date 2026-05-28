@@ -1,23 +1,23 @@
-# Use an official Python runtime as a parent image
-FROM python:3.9-slim
+FROM python:3.13-slim
 
-# Set the working directory in the container
 WORKDIR /usr/src/app
 
-# Install system dependencies
-RUN apt-get update && apt-get install -y ghostscript libgl1 libglib2.0-0
+# Pull the latest security patches and install runtime deps.
+# Ghostscript here comes from Debian Bookworm; CVEs are addressed via
+# bookworm-security updates pulled in by `apt-get upgrade`.
+RUN apt-get update \
+  && apt-get upgrade -y \
+  && apt-get install -y --no-install-recommends \
+       ghostscript \
+       libgl1 \
+       libglib2.0-0 \
+  && rm -rf /var/lib/apt/lists/*
 
-# Copy the current directory contents into the container at /usr/src/app
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
 COPY . .
 
-# Install any needed packages specified in requirements.txt
-RUN pip install --no-cache-dir Flask Flask-Cors opencv-python-headless numpy Pillow img2pdf
-
-# Make port 8080 available to the world outside this container
 EXPOSE 8080
 
-# Define environment variable
-ENV NAME World
-
-# Run app.py when the container launches
 CMD ["python", "app.py"]

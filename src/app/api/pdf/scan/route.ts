@@ -1,7 +1,6 @@
 import { NextRequest } from 'next/server';
 import { verifyAuth } from '@/lib/verify-auth';
-
-const SCAN_API_URL = 'https://pdf-compressor-621306512794.us-central1.run.app/scan';
+import { compressorAuthHeader, compressorUrl } from '@/lib/cloudRunAuth';
 
 export async function POST(req: NextRequest) {
   if (!await verifyAuth(req)) {
@@ -34,7 +33,12 @@ export async function POST(req: NextRequest) {
       if (/^corners_\d+$/.test(key)) upstream.append(key, String(value));
     }
 
-    const response = await fetch(SCAN_API_URL, { method: 'POST', body: upstream });
+    const authHeader = await compressorAuthHeader();
+    const response = await fetch(compressorUrl('/scan'), {
+      method: 'POST',
+      headers: authHeader,
+      body: upstream,
+    });
 
     if (!response.ok) {
       const text = await response.text();
