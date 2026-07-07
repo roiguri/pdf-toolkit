@@ -343,13 +343,15 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       </aside>
 
       {/* Main Content Wrapper */}
-      <div className="flex flex-col sm:pl-16 w-full h-[calc(100vh-3.5rem)] sm:h-screen overflow-hidden">
-        <main className="grid flex-1 gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_1fr] lg:grid-rows-1 overflow-hidden">
+      {/* Below `lg` the panels stack vertically and the wrapper scrolls so nothing is clipped on mobile/tablet.
+          At `lg`+ the panels sit side-by-side at a fixed height and scroll internally. */}
+      <div className="flex flex-col sm:pl-16 w-full h-[calc(100vh-3.5rem)] sm:h-screen overflow-y-auto lg:overflow-hidden">
+        <main className="grid gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 lg:grid-rows-1 lg:flex-1 lg:overflow-hidden">
           <div className="lg:col-span-1 order-1 lg:order-1 h-full">
             {/* Sidebar content (File Explorer) */}
             {sidebar}
           </div>
-          <div className="lg:col-span-2 order-2 lg:order-2 h-full">
+          <div className="lg:col-span-2 order-2 lg:order-2 h-[75vh] lg:h-full">
             {/* Main Workspace */}
             {main}
           </div>
