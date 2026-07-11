@@ -61,7 +61,7 @@ const ActionToolbar = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-40 sm:w-[200px] justify-between">
+        <Button variant="outline" className="w-auto min-w-0 max-w-[200px] shrink justify-between">
           <span className="flex items-center gap-2 min-w-0">
             {activeMode === 'view' && <Eye className="h-4 w-4 flex-shrink-0" />}
             {activeMode === 'split' && <SplitSquareVertical className="h-4 w-4 flex-shrink-0" />}
