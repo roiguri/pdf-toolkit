@@ -711,6 +711,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
                             : null
                         }
                         isEditMode={effectiveIsEditMode}
+                        activeEditTool={effectiveActiveEditTool}
                         annotations={effectiveAnnotations.filter((a: Annotation) => a.pageNumber === pageNum)}
                         selectedAnnotationId={effectiveSelectedAnnotationId}
                         onAnnotationUpdate={effectiveOnAnnotationUpdate}

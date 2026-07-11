@@ -18,6 +18,7 @@
   "noAnnotations": "אין סימניות או הדגשות.",
   "noAnnotationsHint": "סמן עמודים או הדגש טקסט כדי לראות אותם כאן.",
   "page": "עמוד {{number}}",
+  "highlightLabel": "הדגשה:",
   "toasts": {
     "fullscreenFailed": "מעבר למסך מלא נכשל",
     "searchFailed": "החיפוש נכשל",

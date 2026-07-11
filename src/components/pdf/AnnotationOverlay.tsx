@@ -1,5 +1,5 @@
 import React from 'react';
-import { Annotation } from '@/store/useAppStore';
+import { Annotation, AnnotationType } from '@/store/useAppStore';
 import SignatureAnnotation from './SignatureAnnotation';
 
 interface AnnotationOverlayProps {
@@ -8,6 +8,7 @@ interface AnnotationOverlayProps {
   canvasHeight: number;
   scale: number;
   isEditMode: boolean;
+  activeEditTool: AnnotationType | null;
   annotations: Annotation[];  // pre-filtered to this page
   selectedAnnotationId: string | null;
   onAddAnnotation: (position: { x: number; y: number }) => void;
@@ -22,6 +23,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
   canvasHeight,
   scale,
   isEditMode,
+  activeEditTool,
   annotations,
   selectedAnnotationId,
   onAddAnnotation,
@@ -29,8 +31,15 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
   onAnnotationDelete,
   onAnnotationSelect,
 }) => {
+  // Only capture the whole surface while a placement tool (e.g. signature
+  // tap-to-place) is active. Otherwise stay pointer-events:none so the text
+  // layer underneath can receive native drag-to-select for highlighting.
+  // Individual annotations (signature wrapper below, highlight rects) opt
+  // back in to pointer events on themselves regardless of this.
+  const captureClicks = isEditMode && activeEditTool === 'signature';
+
   const handleOverlayClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!isEditMode) return;
+    if (!captureClicks) return;
 
     // Only handle clicks directly on the overlay, not on annotations
     if (e.target !== e.currentTarget) return;
@@ -52,7 +61,7 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
     <div
       className="absolute inset-0"
       style={{
-        pointerEvents: isEditMode ? 'auto' : 'none',
+        pointerEvents: captureClicks ? 'auto' : 'none',
         width: canvasWidth,
         height: canvasHeight,
         zIndex: 50,
@@ -72,17 +81,23 @@ const AnnotationOverlay: React.FC<AnnotationOverlayProps> = ({
           }
 
           return (
-            <SignatureAnnotation
-              key={annotation.id}
-              annotation={annotation}
-              scale={scale}
-              isSelected={selectedAnnotationId === annotation.id}
-              canvasWidth={canvasWidth}
-              canvasHeight={canvasHeight}
-              onSelect={() => onAnnotationSelect(annotation.id)}
-              onDelete={() => onAnnotationDelete(annotation.id)}
-              onUpdate={(updates) => onAnnotationUpdate(annotation.id, updates)}
-            />
+            // pointerEvents: 'auto' re-enables interaction for this annotation
+            // even when the overlay parent above is pointer-events:none, so
+            // dragging/resizing/deleting existing signatures keeps working
+            // outside of the signature placement tool. Same pattern as the
+            // highlight wrapper below.
+            <div key={annotation.id} style={{ pointerEvents: 'auto' }}>
+              <SignatureAnnotation
+                annotation={annotation}
+                scale={scale}
+                isSelected={selectedAnnotationId === annotation.id}
+                canvasWidth={canvasWidth}
+                canvasHeight={canvasHeight}
+                onSelect={() => onAnnotationSelect(annotation.id)}
+                onDelete={() => onAnnotationDelete(annotation.id)}
+                onUpdate={(updates) => onAnnotationUpdate(annotation.id, updates)}
+              />
+            </div>
           );
         }
 

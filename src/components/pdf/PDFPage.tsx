@@ -5,7 +5,7 @@ import { Page } from 'react-pdf';
 import { Loader2 } from 'lucide-react';
 import AnnotationOverlay from './AnnotationOverlay';
 import TextSelectionMenu from './TextSelectionMenu';
-import { Annotation } from '@/store/useAppStore';
+import { Annotation, AnnotationType } from '@/store/useAppStore';
 
 interface PDFPageProps {
   pageNumber: number;
@@ -20,6 +20,7 @@ interface PDFPageProps {
   defaultHeight?: number;
   // Annotation display & interaction
   isEditMode: boolean;
+  activeEditTool: AnnotationType | null;
   annotations: Annotation[];          // pre-filtered to this page by PDFViewer
   selectedAnnotationId: string | null;
   onAnnotationUpdate: (id: string, updates: Partial<Annotation>) => void;
@@ -51,6 +52,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
   focusedMatchIndex,
   defaultHeight,
   isEditMode,
+  activeEditTool,
   annotations,
   selectedAnnotationId,
   onAnnotationUpdate,
@@ -409,6 +411,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
             canvasHeight={canvasDimensions.height}
             scale={scale}
             isEditMode={isEditMode}
+            activeEditTool={activeEditTool}
             annotations={annotations}
             selectedAnnotationId={selectedAnnotationId}
             onAddAnnotation={onAddAnnotation}
