@@ -50,17 +50,9 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
           a.type === 'signature' || a.type === 'text' || (includeHighlights && a.type === 'highlight')
         );
 
-        const pagesDimensions = viewerRef.current?.pagesDimensions ?? {};
-        const scale = viewerRef.current?.scale ?? 1;
-        const pageDims = pagesDimensions[currentPage];
-        const unscaledDimensions = pageDims
-          ? { width: pageDims.width / scale, height: pageDims.height / scale }
-          : undefined;
-
         const annotatedPdfBytes = await embedAnnotationsInPdf(
           file.downloadURL,
           filteredAnnotations,
-          unscaledDimensions,
           [],
         );
 

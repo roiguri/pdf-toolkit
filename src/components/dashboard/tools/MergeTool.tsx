@@ -58,7 +58,6 @@ const MergeTool = () => {
             const annotatedBytes = await embedAnnotationsInPdf(
               buffer,
               filteredAnnotations,
-              undefined,
               file.bookmarks,
             );
             buffer = annotatedBytes.buffer as ArrayBuffer;

@@ -115,7 +115,6 @@ const CompressSidebar = () => {
           const annotatedBytes = await embedAnnotationsInPdf(
             arrayBuffer,
             filteredAnnotations,
-            undefined,
             selectedFile.bookmarks
           );
 
