@@ -502,7 +502,7 @@ const FileExplorer = () => {
 
 
         {/* File List */}
-        <div className="flex-grow overflow-y-auto rounded-md border p-2 max-h-[30vh] sm:max-h-none">
+        <div className="flex-grow overflow-y-auto rounded-md border p-2 max-h-[30vh] lg:max-h-none">
           {filteredFiles.length === 0 ? (
             <p className="p-4 text-center text-muted-foreground">
               {currentFolderId ? t('emptyFolder') : t('noPdfs')}
