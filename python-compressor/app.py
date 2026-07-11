@@ -17,6 +17,15 @@ CLOUD_RUN_AUDIENCE = os.environ['CLOUD_RUN_AUDIENCE']
 INVOKER_SA_EMAIL = os.environ['INVOKER_SA_EMAIL']
 _token_request = g_requests.Request()
 
+# Bound the request body so a large upload cannot exhaust the container's memory.
+# Flask returns 413 on its own once this is exceeded.
+app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100 MB
+
+# Ghostscript gets no timeout by default, so a malformed PDF can hang a worker until
+# Cloud Run cuts the request at 300s. Stay under that so we return a real status code
+# instead of having the connection dropped from under us.
+GS_TIMEOUT_SECONDS = 240
+
 
 def require_auth(f):
     @wraps(f)
@@ -65,8 +74,10 @@ def compress_pdf():
     ]
 
     try:
-        subprocess.run(gs_command, check=True)
+        subprocess.run(gs_command, check=True, timeout=GS_TIMEOUT_SECONDS)
         return send_file(output_path, as_attachment=True, download_name='compressed.pdf')
+    except subprocess.TimeoutExpired:
+        return f'Compression timed out after {GS_TIMEOUT_SECONDS}s', 504
     except subprocess.CalledProcessError as e:
         return f'Error compressing PDF: {e}', 500
     finally:
@@ -108,8 +119,10 @@ def render_pdf_page():
     ]
 
     try:
-        subprocess.run(gs_command, check=True)
+        subprocess.run(gs_command, check=True, timeout=GS_TIMEOUT_SECONDS)
         return send_file(output_path, mimetype='image/png', download_name='page.png')
+    except subprocess.TimeoutExpired:
+        return f'Render timed out after {GS_TIMEOUT_SECONDS}s', 504
     except subprocess.CalledProcessError as e:
         return f'Error rendering PDF: {e}', 500
     finally:
