@@ -60,25 +60,65 @@ A modern web application for managing and manipulating PDF files. Built with Nex
       - **Firestore Database**: Create a database (start in production mode)
       - **Storage**: Set up Cloud Storage
 
-   c. Install Firebase CLI and deploy security rules:
+   c. Install Firebase CLI and deploy security rules **and functions**:
    ```bash
    npm install -g firebase-tools
    firebase login
    firebase init
-   # Select Firestore and Storage when prompted
+   # Select Firestore, Storage, and Functions when prompted
    # Use existing firebase.json configuration
-   firebase deploy --only firestore:rules,storage
+   firebase deploy --only firestore:rules,storage,functions
    ```
 
-   d. Create a `.env.local` file in the root directory with your Firebase configuration (find these in Firebase Console > Project Settings > Your Apps):
+   > **The invite gate lives in `functions/`.** `checkInvite` is a `beforeUserSignedIn`
+   > blocking trigger that rejects any sign-in whose email has no document in the
+   > `invites` collection. Deploy rules without functions and the app is **not**
+   > invite-only — anyone with a Google account can sign in.
+
+   d. Authorize yourself. `firestore.rules` locks the `invites` collection to the Admin
+   SDK (`allow read, write: if false`), so it cannot be edited from the client — add the
+   first invite from the Firebase Console, as a document whose **ID is the email address**:
+
+   ```
+   invites/you@example.com
+   ```
+
+   e. Create a `.env.local` file in the root directory. The `NEXT_PUBLIC_*` values are the
+   client Firebase config (Firebase Console → Project Settings → Your Apps). The rest are
+   server-side and are required for the API routes to work at all:
+
    ```env
+   # Client (Firebase web config — shipped to the browser)
    NEXT_PUBLIC_FIREBASE_API_KEY=your_api_key
    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
    NEXT_PUBLIC_FIREBASE_PROJECT_ID=your_project_id
    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
+
+   # Server — Firebase Admin SDK, verifies signed-in users' ID tokens.
+   # From a service account JSON key (Project Settings → Service accounts).
+   # Without these, every API route returns 401.
+   FIREBASE_PROJECT_ID=your_project_id
+   FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxxxx@your_project.iam.gserviceaccount.com
+   FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+
+   # Server — shared bearer token for headless API clients (see docs/api.md)
+   PDF_API_KEY=any_long_random_string
+
+   # Server — calling the Python service on Cloud Run (see python-compressor/DEPLOY_INSTRUCTIONS.md).
+   # Only needed for compress / convert / scan.
+   COMPRESSOR_BASE_URL=https://your-cloud-run-service-url   # no trailing slash
+   GCP_INVOKER_CLIENT_EMAIL=your-invoker-sa@your_project.iam.gserviceaccount.com
+   GCP_INVOKER_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
    ```
+
+   Keep the `\n` escapes in the private keys literal — the code calls
+   `.replace(/\\n/g, '\n')` and expects escapes, not real newlines.
+
+   When deploying, set every non-`NEXT_PUBLIC_` variable in your host's environment
+   (Netlify: Site configuration → Environment variables). They do not take effect until
+   the next deploy.
 
 4. **Set up the Python compression service** (optional for local dev)
 

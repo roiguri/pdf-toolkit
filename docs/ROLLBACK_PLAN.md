@@ -1,65 +1,77 @@
 # Rollback Plan for PDF Compressor Deployment
 
-This document outlines the rollback procedures for each stage of the deployment process to Google Cloud Run.
+Rollback procedures for the Python compression service on Cloud Run.
 
-## Phase 1: Configuration & Prerequisites
+Substitute `<PROJECT_ID>`, `<REGION>`, and `<TAG>` with your own values — see
+`python-compressor/DEPLOY_INSTRUCTIONS.md` for how to find them.
 
-**Actions:**
-- Enable Cloud Run and Container Registry APIs.
-- Configure Docker authentication.
+## Fastest rollback: revert traffic to the previous revision
 
-**Rollback:**
-1.  **Disable APIs (Optional):** If enabling APIs caused unexpected issues or costs, you can disable them:
-    ```bash
-    gcloud services disable run.googleapis.com containerregistry.googleapis.com
-    ```
-2.  **Reset Docker Config:** If `gcloud auth configure-docker` corrupted your Docker config:
-    -   Restore the backup of `~/.docker/config.json` (Docker usually creates a backup).
-    -   Or manually remove the `gcr.io` helpers from the config file.
+This is almost always the right move. Cloud Run keeps every revision, and shifting
+traffic back is instant — no rebuild, no image work, no risk of pushing something new
+while production is broken. Reach for the image-level steps below only if a bad image
+must actually be destroyed.
 
-## Phase 2: Build & Push Docker Image
+```bash
+gcloud run revisions list --service pdf-compressor --region <REGION>
 
-**Actions:**
-- Build Docker image locally.
-- Push image to Google Container Registry (GCR).
+gcloud run services update-traffic pdf-compressor \
+  --region <REGION> \
+  --to-revisions=<PREVIOUS_REVISION_NAME>=100
+```
 
-**Rollback:**
-1.  **Remove Local Image:**
-    ```bash
-    docker rmi us-central1-docker.pkg.dev/gen-lang-client-0812613801/pdf-tools-repo/pdf-compressor
-    ```
-2.  **Delete Remote Image:** If a bad image was pushed and you want to ensure it's not used:
-    ```bash
-    gcloud artifacts docker images delete us-central1-docker.pkg.dev/gen-lang-client-0812613801/pdf-tools-repo/pdf-compressor:latest --delete-tags --quiet
-    ```
-    *Note: If you used a specific tag instead of latest, delete that tag.*
+Verify the service still rejects unauthenticated callers after any traffic change:
 
-## Phase 3: Deploy to Cloud Run
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' <SERVICE_URL>/does-not-exist
+# 403 = correct (rejected at Google's edge). 404 = publicly invocable — see below.
+```
 
-**Actions:**
-- Deploy the container to Cloud Run as the `pdf-compressor` service.
+## If IAM was changed
 
-**Rollback:**
-1.  **Revert to Previous Revision:**
-    Cloud Run automatically manages revisions. If the new deployment fails or is buggy, route 100% of traffic back to the previous healthy revision.
-    
-    *List revisions to find the previous one:*
-    ```bash
-    gcloud run revisions list --service pdf-compressor --region us-central1
-    ```
-    
-    *Rollback traffic:*
-    ```bash
-    gcloud run services update-traffic pdf-compressor --to-revisions=[PREVIOUS_REVISION_NAME]=100 --region us-central1
-    ```
+The service must be invoker-only. If a deploy re-granted public access — most commonly
+by passing `--allow-unauthenticated`, which re-adds the `allUsers` binding — remove it:
 
-2.  **Delete the Service (Extreme Case):**
-    If the service was created in error and needs to be removed entirely:
-    ```bash
-    gcloud run services delete pdf-compressor --region us-central1
-    ```
+```bash
+gcloud run services remove-iam-policy-binding pdf-compressor \
+  --region <REGION> \
+  --member=allUsers --role=roles/run.invoker
+```
 
-## Verification
-After any rollback, verify the system state:
-1.  Check the Cloud Run console to ensure the correct revision is serving traffic.
-2.  Verify the application endpoint returns the expected response (or error if deleted).
+Confirm the invoker service account still holds `roles/run.invoker` **before** removing
+`allUsers`, or the app loses access the moment the change propagates:
+
+```bash
+gcloud run services get-iam-policy pdf-compressor --region <REGION>
+```
+
+## If a bad image was pushed
+
+The live service is deployed from Container Registry (`gcr.io`), not Artifact Registry.
+
+```bash
+docker rmi gcr.io/<PROJECT_ID>/pdf-compressor:<TAG>
+
+gcloud container images delete gcr.io/<PROJECT_ID>/pdf-compressor:<TAG> --quiet
+```
+
+Deleting an image does **not** roll back a running service — Cloud Run pins the image
+digest at deploy time and keeps serving it. Shift traffic to a known-good revision
+first, then clean up the image.
+
+## Extreme case: delete the service
+
+```bash
+gcloud run services delete pdf-compressor --region <REGION>
+```
+
+This takes `compress`, `convert`, `scan`, and `scan/detect` offline. The rest of the app
+(split, merge, edit, and the client-side viewer) keeps working — those run in the browser
+via `pdf-lib` and do not touch this service.
+
+## Verification after any rollback
+
+1. The intended revision is serving traffic (`gcloud run revisions list`).
+2. An unauthenticated request returns `403`, not `404` — see the check above. IAM changes
+   take a minute or two to propagate.
+3. Compress a file through the deployed web app end to end.

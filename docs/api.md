@@ -12,10 +12,39 @@ A token-authenticated REST API for headless PDF processing. All operations are s
 Every request must include an `Authorization` header:
 
 ```
-Authorization: Bearer <PDF_API_KEY>
+Authorization: Bearer <token>
 ```
 
-The key is set via the `PDF_API_KEY` environment variable on the server. Missing or incorrect tokens return `401 Unauthorized`.
+Missing or incorrect tokens return `401 Unauthorized`.
+
+**Two token types are accepted, and not every endpoint accepts both:**
+
+| Endpoint | API key | Firebase ID token |
+| --- | --- | --- |
+| `/api/pdf/compress` | ✅ | ✅ |
+| `/api/pdf/scan` | ✅ | ✅ |
+| `/api/pdf/scan/detect` | ✅ | ✅ |
+| `/api/pdf/split` | ✅ | ❌ |
+| `/api/pdf/merge` | ✅ | ❌ |
+| `/api/pdf/convert` | ✅ | ❌ |
+
+The **API key** is the `PDF_API_KEY` environment variable on the server. It works on
+every endpoint and is the right choice for headless integrations.
+
+A **Firebase ID token** is what a signed-in web user carries. It is accepted only on the
+endpoints the browser app actually calls. Sending one to `split`, `merge`, or `convert`
+returns 401 — those check the API key by string equality and have no Firebase path.
+
+### Adding an API client
+
+Give the client the `PDF_API_KEY` value and have it send `Authorization: Bearer <key>`.
+There is a single shared key — it is not per-client, so it cannot be revoked for one
+consumer without revoking it for all of them. Rotating it means updating `PDF_API_KEY`
+in the host's environment and redeploying; every client breaks until it gets the new
+value.
+
+The key bypasses Firebase auth entirely, so treat it as a full-access credential: keep it
+out of browsers, client-side bundles, and git.
 
 ---
 
@@ -281,6 +310,21 @@ def compress_pdf(file_path, level='ebook'):
 
 ## Deployment Notes
 
-- Set `PDF_API_KEY` in your hosting platform's environment variables (Netlify: Site configuration → Environment variables)
-- The compress and convert operations depend on the Python Ghostscript service at `https://pdf-compressor-621306512794.us-central1.run.app` (Google Cloud Run, project `pdf-tools-e8e51`)
-- To redeploy the Python service, see `python-compressor/DEPLOY_INSTRUCTIONS.md`
+`compress`, `convert`, `scan`, and `scan/detect` proxy to the Python service on Cloud Run
+(Ghostscript for compress/convert, OpenCV for scan). `split` and `merge` run entirely
+in-process with `pdf-lib` and have no external dependency.
+
+Server-side environment variables — all required, and a missing one surfaces as a 500:
+
+| Variable | Used by |
+| --- | --- |
+| `PDF_API_KEY` | Every endpoint |
+| `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` | Firebase ID token verification (`compress`, `scan`, `scan/detect`) |
+| `COMPRESSOR_BASE_URL`, `GCP_INVOKER_CLIENT_EMAIL`, `GCP_INVOKER_PRIVATE_KEY` | Calling the Cloud Run service |
+
+On Netlify these go in Site configuration → Environment variables. Changes do not take
+effect until the next deploy.
+
+The Cloud Run service is invoker-only: it rejects any caller other than the configured
+service account, at Google's edge. To redeploy it, add a caller, or roll it back, see
+`python-compressor/DEPLOY_INSTRUCTIONS.md` and `docs/ROLLBACK_PLAN.md`.
