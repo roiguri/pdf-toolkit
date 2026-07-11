@@ -230,8 +230,10 @@ const CompressSidebar = () => {
 
       {selectedFile && (
         <div className="text-sm border rounded p-2 bg-muted/50">
-          <span className="text-muted-foreground">{t('compress.selected')}: </span>
-          <span className="font-medium">{selectedFile.name}</span>
+          <div className="flex min-w-0">
+            <span className="text-muted-foreground flex-shrink-0">{t('compress.selected')}: </span>
+            <span className="font-medium truncate" title={selectedFile.name}>{selectedFile.name}</span>
+          </div>
           <span className="text-muted-foreground block text-xs mt-1">
             {t('compress.size')}: {formatBytes(selectedFile.size || 0)}
           </span>
