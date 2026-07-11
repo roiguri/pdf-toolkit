@@ -95,6 +95,62 @@ read in `src/lib/`; a missing one throws at request time and surfaces as a 500.
 
 Env var changes do not reach a running site until the next deploy.
 
+## Rolling back
+
+### Revert traffic to the previous revision
+
+Almost always the right move. Cloud Run keeps every revision, and shifting traffic back
+is instant — no rebuild, no image work, no pushing something new while production is
+broken. Reach for the image steps below only if a bad image must actually be destroyed.
+
+```bash
+gcloud run revisions list --service pdf-compressor --region <REGION>
+
+gcloud run services update-traffic pdf-compressor \
+  --region <REGION> \
+  --to-revisions=<PREVIOUS_REVISION_NAME>=100
+```
+
+Re-run the verification check above afterwards — a traffic change should not affect IAM,
+but confirm the service still returns `403` to unauthenticated callers.
+
+### Restore invoker-only access
+
+If a deploy re-granted public access — most commonly by passing `--allow-unauthenticated`,
+which re-adds the `allUsers` binding — remove it:
+
+```bash
+gcloud run services get-iam-policy pdf-compressor --region <REGION>
+
+gcloud run services remove-iam-policy-binding pdf-compressor \
+  --region <REGION> \
+  --member=allUsers --role=roles/run.invoker
+```
+
+Confirm the invoker service account still holds `roles/run.invoker` **before** removing
+`allUsers`, or the app loses access the moment the change propagates.
+
+### Remove a bad image
+
+```bash
+docker rmi gcr.io/<PROJECT_ID>/pdf-compressor:<TAG>
+gcloud container images delete gcr.io/<PROJECT_ID>/pdf-compressor:<TAG> --quiet
+```
+
+Deleting an image does **not** roll back a running service — Cloud Run pins the image
+digest at deploy time and keeps serving it. Shift traffic to a good revision first, then
+clean up the image.
+
+### Delete the service (extreme case)
+
+```bash
+gcloud run services delete pdf-compressor --region <REGION>
+```
+
+This takes `compress`, `convert`, `scan`, and `scan/detect` offline. The rest of the app
+keeps working — split, merge, edit, and the viewer all run in the browser via `pdf-lib`
+and never touch this service.
+
 ## Adding another caller
 
 Today the service accepts exactly **one** caller. Adding a second takes two steps,

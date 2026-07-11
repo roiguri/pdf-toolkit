@@ -327,4 +327,4 @@ effect until the next deploy.
 
 The Cloud Run service is invoker-only: it rejects any caller other than the configured
 service account, at Google's edge. To redeploy it, add a caller, or roll it back, see
-`python-compressor/DEPLOY_INSTRUCTIONS.md` and `docs/ROLLBACK_PLAN.md`.
+`python-compressor/DEPLOY_INSTRUCTIONS.md`.

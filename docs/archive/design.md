@@ -1,8 +1,21 @@
 # **Architecture & Design Document: Cloud-Based PDF Toolkit**
 
+> **⚠️ ARCHIVED — historical planning document, not a description of the current system.**
+>
+> Written before implementation (November 2025) and never updated. The system as built
+> diverged from it in significant ways: compression runs on a Python/Ghostscript service
+> on Cloud Run rather than the Firebase Cloud Function proposed in §7.2, and the Scan and
+> Edit features described nowhere here are now core functionality.
+>
+> Retained as a record of the original intent. **Do not use it to understand how the app
+> works today** — see [`README.md`](../../README.md) for setup and features,
+> [`docs/api.md`](../api.md) for the API surface and auth model, and
+> [`python-compressor/DEPLOY_INSTRUCTIONS.md`](../../python-compressor/DEPLOY_INSTRUCTIONS.md)
+> for the infrastructure.
+
 **Version:** 1.0
 
-**Status:** Approved for Development
+**Status:** Approved for Development *(superseded — see banner above)*
 
 **Tech Stack:** Next.js, TypeScript, Firebase (Auth, Firestore, Storage), pdf-lib, react-pdf
 
