@@ -91,6 +91,9 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
     height: number;
     canvasWidth: number;
     canvasHeight: number;
+    // On-screen (px) aspect ratio at the moment the gesture started. Fixed for
+    // the whole gesture so incremental per-frame deltas can't let it drift.
+    aspectRatio: number;
   } | null>(null);
 
   const handleResizeStart = () => {
@@ -101,11 +104,15 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
         height: rect.height,
         canvasWidth,
         canvasHeight,
+        aspectRatio: rect.height > 0 ? rect.width / rect.height : 1,
       };
     }
   };
 
-  // Resize handler
+  // Resize handler. `deltaX`/`deltaY` are the pointer's raw on-screen (physical,
+  // not RTL-flipped) movement since the last frame — ResizeHandles reports a
+  // per-frame delta, not a cumulative one — so this recomputes from the latest
+  // `size`/`position` state on every call rather than from resize-start values.
   const handleResize = (deltaX: number, deltaY: number, handle: ResizeHandle) => {
     // Use canvas dimensions from resize start to prevent shifts during resize
     const resizeCanvasWidth = initialResizeState.current?.canvasWidth || canvasWidth;
@@ -118,32 +125,59 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
     const relativeDeltaX = deltaX / resizeCanvasWidth;
     const relativeDeltaY = deltaY / resizeCanvasHeight;
 
+    const minW = minWidth / resizeCanvasWidth;
+    const minH = minHeight / resizeCanvasHeight;
+
     let newW = size.width;
     let newH = size.height;
     let newX = position.x;
     let newY = position.y;
 
-    switch (handle) {
-      case 'bottom-right':
-        newW = Math.max(minWidth / resizeCanvasWidth, size.width + relativeDeltaX);
-        newH = Math.max(minHeight / resizeCanvasHeight, size.height + relativeDeltaY);
-        break;
-      case 'bottom-left':
-        newW = Math.max(minWidth / resizeCanvasWidth, size.width - relativeDeltaX);
-        newH = Math.max(minHeight / resizeCanvasHeight, size.height + relativeDeltaY);
-        newX = position.x + relativeDeltaX;
-        break;
-      case 'top-right':
-        newW = Math.max(minWidth / resizeCanvasWidth, size.width + relativeDeltaX);
-        newH = Math.max(minHeight / resizeCanvasHeight, size.height - relativeDeltaY);
-        newY = position.y + relativeDeltaY;
-        break;
-      case 'top-left':
-        newW = Math.max(minWidth / resizeCanvasWidth, size.width - relativeDeltaX);
-        newH = Math.max(minHeight / resizeCanvasHeight, size.height - relativeDeltaY);
-        newX = position.x + relativeDeltaX;
-        newY = position.y + relativeDeltaY;
-        break;
+    if (lockAspectRatio) {
+      const aspectRatio = initialResizeState.current?.aspectRatio || 1;
+      const growsRight = handle === 'bottom-right' || handle === 'top-right';
+      const growsDown = handle === 'bottom-right' || handle === 'bottom-left';
+
+      // All four handles are corners, so both edges move together. Drive the
+      // resize off whichever axis the pointer moved more this frame, and derive
+      // the other dimension from the locked ratio — this keeps a mostly-horizontal
+      // or mostly-vertical drag feeling responsive instead of fighting the user.
+      if (Math.abs(deltaX) >= Math.abs(deltaY)) {
+        const signedDeltaX = growsRight ? relativeDeltaX : -relativeDeltaX;
+        newW = Math.max(minW, size.width + signedDeltaX);
+        newH = Math.max(minH, (newW * resizeCanvasWidth) / aspectRatio / resizeCanvasHeight);
+      } else {
+        const signedDeltaY = growsDown ? relativeDeltaY : -relativeDeltaY;
+        newH = Math.max(minH, size.height + signedDeltaY);
+        newW = Math.max(minW, (newH * resizeCanvasHeight) * aspectRatio / resizeCanvasWidth);
+      }
+
+      // Keep the corner opposite the dragged handle anchored in place.
+      if (!growsRight) newX = position.x + (size.width - newW);
+      if (!growsDown) newY = position.y + (size.height - newH);
+    } else {
+      switch (handle) {
+        case 'bottom-right':
+          newW = Math.max(minW, size.width + relativeDeltaX);
+          newH = Math.max(minH, size.height + relativeDeltaY);
+          break;
+        case 'bottom-left':
+          newW = Math.max(minW, size.width - relativeDeltaX);
+          newH = Math.max(minH, size.height + relativeDeltaY);
+          newX = position.x + relativeDeltaX;
+          break;
+        case 'top-right':
+          newW = Math.max(minW, size.width + relativeDeltaX);
+          newH = Math.max(minH, size.height - relativeDeltaY);
+          newY = position.y + relativeDeltaY;
+          break;
+        case 'top-left':
+          newW = Math.max(minW, size.width - relativeDeltaX);
+          newH = Math.max(minH, size.height - relativeDeltaY);
+          newX = position.x + relativeDeltaX;
+          newY = position.y + relativeDeltaY;
+          break;
+      }
     }
 
     // Clamp position to valid range (0-1)
