@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { compressorAuthHeader, compressorUrl } from '@/lib/cloudRunAuth';
+import { contentDisposition } from '@/lib/content-disposition';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.PDF_API_KEY;
@@ -48,11 +49,12 @@ export async function POST(req: NextRequest) {
     return new Response(imageBuffer, {
       headers: {
         'Content-Type': 'image/png',
-        'Content-Disposition': `attachment; filename="${outName}"`,
+        'Content-Disposition': contentDisposition(outName),
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error('[api/pdf/convert]', error);
     return Response.json({ error: message }, { status: 500 });
   }
 }

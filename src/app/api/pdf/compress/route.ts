@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server';
 import { verifyAuth } from '@/lib/verify-auth';
 import { compressorAuthHeader, compressorUrl } from '@/lib/cloudRunAuth';
+import { contentDisposition } from '@/lib/content-disposition';
 
 const VALID_LEVELS = ['screen', 'ebook', 'prepress'] as const;
 type CompressionLevel = typeof VALID_LEVELS[number];
@@ -33,7 +34,7 @@ export async function POST(req: NextRequest) {
   try {
     const upstream = new FormData();
     upstream.append('file', file);
-    upstream.append('quality', level);
+    upstream.append('level', level);
 
     const authHeader = await compressorAuthHeader();
     const response = await fetch(compressorUrl('/compress'), {
@@ -53,11 +54,12 @@ export async function POST(req: NextRequest) {
     return new Response(compressed, {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${outName}"`,
+        'Content-Disposition': contentDisposition(outName),
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error('[api/pdf/compress]', error);
     return Response.json({ error: message }, { status: 500 });
   }
 }

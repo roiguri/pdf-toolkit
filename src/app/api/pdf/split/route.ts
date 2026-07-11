@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server';
 import { splitPdf } from '@/lib/pdf-utils';
+import { contentDisposition } from '@/lib/content-disposition';
 
 export async function POST(req: NextRequest) {
   const apiKey = process.env.PDF_API_KEY;
@@ -36,11 +37,12 @@ export async function POST(req: NextRequest) {
     return new Response(Buffer.from(bytes), {
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="${filename}"`,
+        'Content-Disposition': contentDisposition(filename),
       },
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error('[api/pdf/split]', error);
     return Response.json({ error: message }, { status: 500 });
   }
 }
