@@ -235,10 +235,23 @@ const DraggableAnnotation: React.FC<DraggableAnnotationProps> = ({
                 e.stopPropagation();
                 onDelete();
               }}
-              className="absolute -top-6 -right-6 bg-red-500 text-white rounded-full p-1.5 shadow-md hover:bg-red-600 transition-colors"
               onPointerDown={(e) => e.stopPropagation()}
+              className="group absolute flex items-center justify-center"
+              style={{
+                // Same visual position as the plain "-top-6 -right-6" button this
+                // replaces, but with a larger invisible tap target: padding grows
+                // the hit box only upward/rightward — away from the top-right
+                // resize handle that sits right at this corner — so the two
+                // controls' hit areas don't get any closer together. The visible
+                // red disc (below) stays exactly where and how big it was.
+                top: -24 - 10,
+                right: -24 - 10,
+                padding: '10px 10px 0 0',
+              }}
             >
-              <Trash2 size={14} />
+              <span className="flex items-center justify-center bg-red-500 text-white rounded-full p-1.5 shadow-md transition-colors group-hover:bg-red-600">
+                <Trash2 size={14} />
+              </span>
             </button>
           </>
         )}
