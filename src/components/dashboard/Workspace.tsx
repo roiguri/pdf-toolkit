@@ -22,12 +22,12 @@ const Workspace = () => {
   );
 
   return (
-    <Card className="flex h-full flex-col overflow-hidden">
+    <Card className="flex lg:h-full flex-col lg:overflow-hidden">
       <CardHeader className="flex-shrink-0 flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle>{t('workspace')}</CardTitle>
         <ActionToolbar />
       </CardHeader>
-      <CardContent className="flex flex-grow flex-col space-y-4 overflow-hidden">
+      <CardContent className="flex flex-grow flex-col space-y-4 lg:overflow-hidden">
 
         {activeMode === 'view' && (
           selectedFile ? <ViewTool file={selectedFile} /> : noFile('view')

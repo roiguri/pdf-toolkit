@@ -506,7 +506,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
   return (
     <div
       ref={viewerContainerRef}
-      className={`flex flex-col w-full h-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
+      className={`flex flex-col w-full lg:h-full ${isFullscreen ? 'h-screen bg-background p-4 space-y-4' : 'space-y-4'}`}
     >
       {file ? (
         <>
@@ -618,7 +618,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </div>
           )}
 
-          <div className="flex flex-1 gap-2 overflow-hidden h-full">
+          <div className="flex flex-1 gap-2 lg:overflow-hidden lg:h-full">
             {/* Thumbnails */}
             {showThumbnails && (
               <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
@@ -657,9 +657,12 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
               <AnnotationsSidebar onScrollToPage={scrollToPage} />
             )}
 
-            {/* Scrollable PDF List */}
+            {/* Scrollable PDF List. Pages are fit-to-width, so one page's height is a function
+                of this container's width. Below lg the stacked layout has no height to inherit,
+                so the aspect ratio is what keeps a full A4 page (1:1.414, taller than Letter) on
+                screen; at lg the split-pane supplies a real height instead. */}
             <div
-              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable]"
+              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] aspect-[1/1.414] lg:aspect-auto"
               ref={pageContainerRef}
               {...bind()}
               onClick={handleBackgroundClick} // Handle outside click
