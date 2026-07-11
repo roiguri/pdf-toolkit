@@ -311,16 +311,53 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
       });
     };
 
+    // Long-press selection and selection-handle drags on mobile don't reliably
+    // fire mouseup, so also catch touch releases directly, plus a debounced
+    // selectionchange as a fallback for handle-drag adjustments (plain
+    // selectionchange fires on every caret move and was too noisy on its own,
+    // hence the debounce + non-collapsed check here).
+    let selectionChangeTimer: ReturnType<typeof setTimeout> | null = null;
+    const handleSelectionChangeDebounced = () => {
+      if (selectionChangeTimer) clearTimeout(selectionChangeTimer);
+      selectionChangeTimer = setTimeout(() => {
+        const selection = window.getSelection();
+        if (selection && !selection.isCollapsed) {
+          handleSelection();
+        }
+      }, 300);
+    };
+
     const container = pageContentRef.current;
     if (container) {
       document.addEventListener('mouseup', handleSelection);
-      // document.addEventListener('selectionchange', handleSelection); // Too noisy
+      document.addEventListener('touchend', handleSelection);
+      document.addEventListener('selectionchange', handleSelectionChangeDebounced);
     }
 
     return () => {
       document.removeEventListener('mouseup', handleSelection);
+      document.removeEventListener('touchend', handleSelection);
+      document.removeEventListener('selectionchange', handleSelectionChangeDebounced);
+      if (selectionChangeTimer) clearTimeout(selectionChangeTimer);
     };
   }, []);
+
+  // Deselect the selected annotation on an empty-area tap. AnnotationOverlay
+  // only captures clicks while the signature tool is active (so the text
+  // layer underneath stays selectable the rest of the time), which means taps
+  // on empty page area no longer reach it directly outside that mode. This
+  // restores the deselect without re-capturing clicks: annotation elements
+  // themselves call stopPropagation on click, so this only ever fires for
+  // genuinely empty taps, and the signature tool keeps handling its own
+  // empty-area clicks via the overlay to avoid double-handling.
+  const handlePageContentClick = useCallback(() => {
+    if (!isEditMode || activeEditTool === 'signature' || !selectedAnnotationId) return;
+    // A non-collapsed selection means this click ended a text-selection drag,
+    // not a tap on empty page area.
+    const selection = window.getSelection();
+    if (selection && !selection.isCollapsed) return;
+    onAnnotationSelect(null);
+  }, [isEditMode, activeEditTool, selectedAnnotationId, onAnnotationSelect]);
 
   const handleHighlight = (color: string) => {
     if (selectedRects.length === 0) return;
@@ -350,7 +387,7 @@ export const PDFPage = React.forwardRef<HTMLDivElement, PDFPageProps>(({
       className="relative mb-4 flex"
       style={{ minHeight: '300px' }} // Minimum height to prevent total collapse
     >
-      <div ref={pageContentRef} className="relative w-fit mx-auto">
+      <div ref={pageContentRef} className="relative w-fit mx-auto" onClick={handlePageContentClick}>
         {useMemo(() => (
           shouldRender ? (
             <Page

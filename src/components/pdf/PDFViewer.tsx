@@ -513,7 +513,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
           {/* Controls toolbar */}
           <div className="flex flex-wrap items-center justify-center gap-2 w-full relative">
             <Button onClick={toggleThumbnails} variant="outline" size="icon" title={showThumbnails ? t('hidePages') : t('showPages')}>
-              {showThumbnails ? <PanelLeftClose className="h-4 w-4" /> : <PanelLeftOpen className="h-4 w-4" />}
+              {showThumbnails ? <PanelLeftClose className="h-4 w-4 rtl:rotate-180" /> : <PanelLeftOpen className="h-4 w-4 rtl:rotate-180" />}
             </Button>
 
             <Button onClick={toggleBookmarks} variant="outline" size="icon" title={showBookmarks ? t('hideBookmarks') : t('showBookmarks')}>
@@ -530,7 +530,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </Button>
 
             {isSearchOpen && (
-              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 bg-background border p-2 rounded-md shadow-lg flex items-center gap-2 min-w-[300px]">
+              <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-20 bg-background border p-2 rounded-md shadow-lg flex items-center gap-2 w-[min(300px,calc(100vw-2rem))]">
                 <form onSubmit={(e) => e.preventDefault()} className="flex items-center gap-2 flex-1">
                   <Input
                     value={searchQuery}
@@ -591,7 +591,7 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </Button>
 
             {/* Zoom controls */}
-            <div className="flex items-center gap-1 ml-2">
+            <div className="flex items-center gap-1 ms-2">
               <Button onClick={zoomOut} disabled={scale <= MIN_SCALE} variant="outline" size="icon" title={t('zoomOut')}>
                 <ZoomOut className="h-4 w-4" />
               </Button>
@@ -618,10 +618,12 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             </div>
           )}
 
-          <div className="flex flex-1 gap-2 lg:overflow-hidden lg:h-full">
-            {/* Thumbnails */}
+          <div className="relative flex flex-1 gap-2 lg:overflow-hidden lg:h-full">
+            {/* Thumbnails. Below lg this floats over the PDF pane instead of sharing
+                the row with it — at 360-430px wide, a flex sibling this size left the
+                PDF with almost no width. At lg it goes back to being a normal column. */}
             {showThumbnails && (
-              <div className="w-32 flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
+              <div className="absolute inset-y-0 start-0 z-30 w-32 shadow-lg lg:shadow-none lg:z-auto lg:static lg:flex-shrink-0 border rounded-md bg-muted/30 overflow-y-auto p-2 space-y-2">
                 <Document file={file.downloadURL} loading={null} onLoadSuccess={() => setThumbnailsReady(true)}>
                   {thumbnailsReady && Array.from({ length: numPages || 0 }, (_, index) => (
                     <button
@@ -652,7 +654,9 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
               </div>
             )}
 
-            {/* Bookmarks Sidebar */}
+            {/* Bookmarks Sidebar. Same floating-overlay treatment below lg as the
+                thumbnails panel above — the two are mutually exclusive (toggling one
+                closes the other), so both can anchor to the same start edge. */}
             {showBookmarks && (
               <AnnotationsSidebar onScrollToPage={scrollToPage} />
             )}
@@ -660,9 +664,13 @@ export const PDFViewer = forwardRef<PDFViewerHandle, PDFViewerProps>(function PD
             {/* Scrollable PDF List. Pages are fit-to-width, so one page's height is a function
                 of this container's width. Below lg the stacked layout has no height to inherit,
                 so the aspect ratio is what keeps a full A4 page (1:1.414, taller than Letter) on
-                screen; at lg the split-pane supplies a real height instead. */}
+                screen; at lg the split-pane supplies a real height instead. In short/wide
+                viewports (e.g. landscape phones) a width-driven aspect box can dwarf the actual
+                viewport height, so it's also capped below lg — content already scrolls inside
+                (overflow-auto), so clamping the box's height is safe. The cap is generous enough
+                to stay a no-op in portrait. */}
             <div
-              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] aspect-[1/1.414] lg:aspect-auto"
+              className="border p-2 rounded-md shadow-md bg-background overflow-auto flex-1 [scrollbar-gutter:stable] aspect-[1/1.414] max-h-[calc(100dvh-6rem)] lg:aspect-auto lg:max-h-none"
               ref={pageContainerRef}
               {...bind()}
               onClick={handleBackgroundClick} // Handle outside click

@@ -62,7 +62,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
 
   if (items.length === 0) {
     return (
-      <div className="w-72 border-s bg-background p-4 flex flex-col items-center justify-center text-muted-foreground h-full">
+      <div className="absolute inset-y-0 start-0 z-30 shadow-lg lg:shadow-none lg:z-auto lg:static w-72 border-s bg-background p-4 flex flex-col items-center justify-center text-muted-foreground h-full">
         <ScrollText className="h-12 w-12 mb-2 opacity-50" />
         <p className="text-sm text-center">{t('noAnnotations')}</p>
         <p className="text-xs text-center mt-1">{t('noAnnotationsHint')}</p>
@@ -106,7 +106,7 @@ const AnnotationsSidebar: React.FC<AnnotationsSidebarProps> = ({ onScrollToPage 
   };
 
   return (
-    <div className="w-72 border-s bg-background flex flex-col h-full">
+    <div className="absolute inset-y-0 start-0 z-30 shadow-lg lg:shadow-none lg:z-auto lg:static w-72 border-s bg-background flex flex-col h-full">
       <div className="p-3 border-b font-medium flex items-center gap-2">
         <ScrollText className="h-4 w-4" />
         {t('annotations')}
