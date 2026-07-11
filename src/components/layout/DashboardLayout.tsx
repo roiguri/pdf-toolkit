@@ -312,9 +312,9 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
   );
 
   return (
-    <div className="flex min-h-screen w-full flex-col sm:flex-row">
+    <div className="flex min-h-dvh w-full flex-col sm:flex-row">
       {/* Sidebar Navigation - Fixed on Desktop, Top bar on Mobile */}
-      <aside className="sm:fixed sm:inset-y-0 sm:left-0 sm:z-10 sm:flex sm:w-16 sm:flex-col sm:border-r bg-background sm:items-center sm:py-4">
+      <aside className="sm:fixed sm:inset-y-0 sm:start-0 sm:z-10 sm:flex sm:w-16 sm:flex-col sm:border-e bg-background sm:items-center sm:py-4">
 
         {/* Logo */}
         <nav className="flex sm:flex-col items-center gap-4 px-4 sm:px-0 w-full sm:w-auto justify-between sm:justify-start h-14 sm:h-auto border-b sm:border-0">
@@ -343,7 +343,7 @@ const DashboardLayout = ({ sidebar, main }: DashboardLayoutProps) => {
       </aside>
 
       {/* Main Content Wrapper */}
-      <div className="flex flex-col sm:pl-16 w-full h-[calc(100dvh-3.5rem)] sm:h-dvh overflow-hidden">
+      <div className="flex flex-col sm:ps-16 w-full h-[calc(100dvh-3.5rem)] sm:h-dvh overflow-hidden">
         {/* Below lg the panes stack and this scrolls; at lg it becomes a two-column
             split where each pane scrolls internally instead. */}
         <main className="grid flex-1 gap-4 p-4 sm:px-6 sm:py-6 md:gap-8 lg:grid-cols-3 xl:grid-cols-3 grid-cols-1 grid-rows-[auto_auto] lg:grid-rows-1 overflow-y-auto lg:overflow-hidden">
