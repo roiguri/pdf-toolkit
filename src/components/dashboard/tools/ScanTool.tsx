@@ -32,8 +32,27 @@ function downloadBlob(blob: Blob, filename: string) {
 
 // --- Corner handle drag logic ---
 
-const MAG_SIZE = 160; // magnifier window px
-const MAG_ZOOM = 4;   // zoom factor
+const MAG_SIZE_DEFAULT = 160; // magnifier window px, `sm` and up
+const MAG_SIZE_SM = 112;      // magnifier window px, below `sm` (matches Tailwind's 640px breakpoint)
+const MAG_ZOOM = 4;           // zoom factor
+
+/** Tracks which magnifier size applies, so the one constant backs both the div's
+ * rendered size and the background-position math instead of hardcoding it twice. */
+function useMagnifierSize(): number {
+  const getSize = () =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches
+      ? MAG_SIZE_DEFAULT
+      : MAG_SIZE_SM;
+  const [size, setSize] = useState(getSize);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const update = () => setSize(getSize());
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return size;
+}
 
 interface MagnifierProps {
   previewUrl: string;
@@ -43,16 +62,17 @@ interface MagnifierProps {
 }
 
 function Magnifier({ previewUrl, corner, origWidth, origHeight }: MagnifierProps) {
+  const magSize = useMagnifierSize();
   const bgW = origWidth * MAG_ZOOM;
   const bgH = origHeight * MAG_ZOOM;
-  const bgX = -(corner[0] * MAG_ZOOM - MAG_SIZE / 2);
-  const bgY = -(corner[1] * MAG_ZOOM - MAG_SIZE / 2);
+  const bgX = -(corner[0] * MAG_ZOOM - magSize / 2);
+  const bgY = -(corner[1] * MAG_ZOOM - magSize / 2);
   return (
     <div
       className="absolute top-2 end-2 rounded-lg border-2 border-blue-500 overflow-hidden shadow-xl pointer-events-none"
       style={{
-        width: MAG_SIZE,
-        height: MAG_SIZE,
+        width: magSize,
+        height: magSize,
         backgroundImage: `url(${previewUrl})`,
         backgroundSize: `${bgW}px ${bgH}px`,
         backgroundPosition: `${bgX}px ${bgY}px`,
@@ -100,6 +120,9 @@ function getImageRect(cw: number, ch: number, origWidth: number, origHeight: num
 // Drag sensitivity: 1/MAG_ZOOM means the corner moves 1px per 4px of pointer
 // movement, so it moves 1:1 as seen inside the magnifier.
 const DRAG_SENSITIVITY = 1 / MAG_ZOOM;
+
+// Touch-friendly hit area for corner handles (~44px), independent of the smaller visible dot.
+const HANDLE_HIT_SIZE = 44;
 
 interface DragStart { px: number; py: number; cx: number; cy: number }
 
@@ -199,14 +222,17 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
         />
       </svg>
 
-      {/* Corner handles */}
+      {/* Corner handles — the visible dot stays small; the hit area is enlarged to
+          a touch-friendly ~44px, centered on the same anchor point as the dot. */}
       {pts.map((p, i) => (
         <div
           key={i}
           onPointerDown={onPointerDown(i)}
-          className="absolute w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-md cursor-grab active:cursor-grabbing touch-none"
-          style={{ left: p.x - 10, top: p.y - 10, zIndex: 10 }}
-        />
+          className="absolute flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
+          style={{ left: p.x - HANDLE_HIT_SIZE / 2, top: p.y - HANDLE_HIT_SIZE / 2, width: HANDLE_HIT_SIZE, height: HANDLE_HIT_SIZE, zIndex: 10 }}
+        >
+          <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-md pointer-events-none" />
+        </div>
       ))}
 
       {/* Magnifier — shown while dragging a corner */}
@@ -403,8 +429,9 @@ const ScanTool = () => {
               <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> <span className="hidden sm:inline">{backToAdjustLabel}</span>
             </Button>
             <Button onClick={handleScan} disabled={isScanning} title={scanLabel} aria-label={scanLabel}>
-              {isScanning && <Loader2 className="h-4 w-4 animate-spin" />}
-              <ScanLine className="h-4 w-4" />
+              {isScanning
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <ScanLine className="h-4 w-4" />}
               <span className="hidden sm:inline">{scanLabel}</span>
               <span className="sm:hidden">{images.length}</span>
             </Button>
