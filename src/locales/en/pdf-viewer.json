@@ -18,6 +18,7 @@
   "noAnnotations": "No bookmarks or highlights.",
   "noAnnotationsHint": "Mark pages or highlight text to see them here.",
   "page": "Page {{number}}",
+  "highlightLabel": "Highlight:",
   "toasts": {
     "fullscreenFailed": "Failed to toggle fullscreen",
     "searchFailed": "Failed to perform search",

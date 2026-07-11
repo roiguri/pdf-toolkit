@@ -20,7 +20,7 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport, includeHighlights, 
   ];
 
   return (
-    <div className="flex items-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg">
+    <div className="flex flex-wrap items-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg">
       <div className="flex items-center gap-1 border-e border-gray-200 pe-3">
         {tools.map((tool) => (
           <button
@@ -40,13 +40,15 @@ const EditToolbar: React.FC<EditToolbarProps> = ({ onExport, includeHighlights, 
 
       <div className="flex items-center gap-2 border-e border-gray-200 pe-3">
         {/* Include Highlights Option */}
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center gap-2">
           <Checkbox
             id="include-highlights-edit"
             checked={includeHighlights}
             onCheckedChange={(checked) => setIncludeHighlights(checked === true)}
+            title={t('edit.includeHighlights')}
+            aria-label={t('edit.includeHighlights')}
           />
-          <Label htmlFor="include-highlights-edit" className="text-sm font-medium leading-none cursor-pointer">
+          <Label htmlFor="include-highlights-edit" className="hidden sm:inline text-sm font-medium leading-none cursor-pointer">
             {t('edit.includeHighlights')}
           </Label>
         </div>

@@ -50,17 +50,9 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
           a.type === 'signature' || a.type === 'text' || (includeHighlights && a.type === 'highlight')
         );
 
-        const pagesDimensions = viewerRef.current?.pagesDimensions ?? {};
-        const scale = viewerRef.current?.scale ?? 1;
-        const pageDims = pagesDimensions[currentPage];
-        const unscaledDimensions = pageDims
-          ? { width: pageDims.width / scale, height: pageDims.height / scale }
-          : undefined;
-
         const annotatedPdfBytes = await embedAnnotationsInPdf(
           file.downloadURL,
           filteredAnnotations,
-          unscaledDimensions,
           [],
         );
 
@@ -103,7 +95,7 @@ const ConvertTool = ({ file }: ConvertToolProps) => {
 
   return (
     <div className="flex flex-col h-full gap-4">
-      <div className="flex items-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg w-fit mx-auto">
+      <div className="flex flex-wrap items-center justify-center gap-3 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-xl shadow-lg w-fit mx-auto">
         <div className="flex items-center space-x-2">
           <Checkbox
             id="include-highlights-convert"

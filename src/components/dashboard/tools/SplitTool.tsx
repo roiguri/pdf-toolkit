@@ -59,7 +59,6 @@ const SplitTool = ({ file }: SplitToolProps) => {
         const annotatedBytes = await embedAnnotationsInPdf(
           arrayBuffer,
           filteredAnnotations,
-          undefined,
           file.bookmarks,
         );
         arrayBuffer = annotatedBytes.buffer as ArrayBuffer;

@@ -99,6 +99,15 @@
     "includeHighlights": "כלול הדגשות",
     "clearSignatures": "נקה חתימות",
     "export": "ייצא",
+    "signatureModal": {
+      "title": "צייר את חתימתך",
+      "close": "סגור",
+      "savedSignature": "חתימה שמורה",
+      "useSaved": "השתמש בשמורה",
+      "saveToProfile": "שמור בפרופיל",
+      "clear": "נקה",
+      "addNew": "הוסף חדשה"
+    },
     "toasts": {
       "signatureSaved": "החתימה נשמרה בפרופיל",
       "signatureFailed": "שמירת החתימה בפרופיל נכשלה",

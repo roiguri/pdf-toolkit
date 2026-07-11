@@ -108,16 +108,22 @@ export const mergePdfs = async (
 
 /**
  * Embeds annotations (text and signatures) into a PDF document.
+ *
+ * Geometry is a pure function of the annotation's normalized (0-1) position/size
+ * and each target page's own point size (`page.getSize()`). It must never depend on
+ * the on-screen canvas size, zoom level, or device — annotation data is already
+ * normalized at creation time (see AnnotationOverlay/DraggableAnnotation), and every
+ * caller (edit/split/merge/convert/compress) must get the same geometry back for the
+ * same annotations regardless of what device produced them.
+ *
  * @param pdfSource The URL of the PDF or ArrayBuffer to annotate.
  * @param annotations The annotations to embed.
- * @param canvasDimensions The dimensions of the rendered canvas (for coordinate conversion).
  * @param bookmarks Optional list of bookmarks.
  * @returns The bytes of the annotated PDF.
  */
 export const embedAnnotationsInPdf = async (
   pdfSource: string | ArrayBuffer,
   annotations: Annotation[],
-  canvasDimensions?: { width: number; height: number },
   bookmarks?: Bookmark[]
 ): Promise<Uint8Array> => {
   let arrayBuffer: ArrayBuffer;
@@ -152,9 +158,6 @@ export const embedAnnotationsInPdf = async (
     const page = pdfDoc.getPage(pageIndex);
     const { width: pageWidth, height: pageHeight } = page.getSize();
 
-    // Default to page size if no canvas dimensions provided (fallback)
-    const currentCanvasDimensions = canvasDimensions || { width: pageWidth, height: pageHeight };
-
     // Convert relative coordinates (0-1) to PDF coordinates
     // Note: PDF coordinates start from bottom-left, canvas from top-left
     const pdfX = annotation.position.x * pageWidth;
@@ -166,21 +169,21 @@ export const embedAnnotationsInPdf = async (
 
       const color = hexToRgb(fontColor);
 
-      // Scale font size based on canvas to PDF ratio
-      const scaleFactor = pageHeight / currentCanvasDimensions.height;
-      const scaledFontSize = fontSize * scaleFactor;
-
-      // Account for text box padding (px-2 = 8px, py-1 = 4px in Tailwind)
-      // Slight adjustment for font rendering differences
-      const paddingX = 6 * scaleFactor;
-      const paddingY = 4 * scaleFactor;
+      // fontSize is an absolute PDF point size (not canvas-relative), so it's used as-is.
+      // Fixed point-space padding approximating the on-screen text box's padding
+      // (Tailwind px-2/py-1). Deliberately NOT scaled by canvas/page size: a flat
+      // constant keeps export geometry independent of device and zoom, which a
+      // canvas-derived scale factor cannot guarantee (that was the root cause of
+      // this annotation pipeline's device-dependent export bug).
+      const paddingX = 6;
+      const paddingY = 4;
 
       // Draw text (adjust for padding and text baseline)
       // Text is positioned from its baseline in PDF coordinates
       page.drawText(annotation.content, {
         x: pdfX + paddingX,
-        y: pdfY - paddingY - scaledFontSize, // Adjust for padding and text baseline
-        size: scaledFontSize,
+        y: pdfY - paddingY - fontSize, // Adjust for padding and text baseline
+        size: fontSize,
         font,
         color: rgb(color.r, color.g, color.b),
       });
@@ -189,9 +192,15 @@ export const embedAnnotationsInPdf = async (
       const storedWidth = annotation.style?.width || 0;
       const storedHeight = annotation.style?.height || 0;
 
-      // Detect if values are legacy absolute pixels (> 1) or new relative (0-1)
-      const relativeWidth = storedWidth > 1 ? storedWidth / currentCanvasDimensions.width : storedWidth;
-      const relativeHeight = storedHeight > 1 ? storedHeight / currentCanvasDimensions.height : storedHeight;
+      // Detect legacy records that stored signature size in absolute pixels (> 1)
+      // instead of the normalized 0-1 fraction current code always writes. We have
+      // no way to recover the canvas size those pixels were captured against, so we
+      // interpret them deterministically against the PDF page size instead. This is
+      // an approximation for old data, but — unlike the previous heuristic, which
+      // rescaled by whatever canvas happened to be open on the exporting device — it
+      // is reproducible: the same legacy record now exports identically everywhere.
+      const relativeWidth = storedWidth > 1 ? storedWidth / pageWidth : storedWidth;
+      const relativeHeight = storedHeight > 1 ? storedHeight / pageHeight : storedHeight;
 
       // Convert relative dimensions to PDF dimensions
       const scaledWidth = relativeWidth * pageWidth;
@@ -205,13 +214,13 @@ export const embedAnnotationsInPdf = async (
         // Embed the image (PNG format from signature canvas)
         const image = await pdfDoc.embedPng(imageBytes);
 
-        // Draw the signature image
-        // Small offset adjustment to align with visual position
-        const scaleFactor = pageHeight / currentCanvasDimensions.height;
-        const offsetX = 2 * scaleFactor;
-
+        // Draw the signature image. (The previous "+2px * scaleFactor" alignment
+        // offset here was itself canvas-size-derived, so it made the misalignment
+        // it was meant to fix device-dependent too. pdfX/pdfY already come straight
+        // from the normalized position and this page's own size, so no offset is
+        // needed here.)
         page.drawImage(image, {
-          x: pdfX + offsetX,
+          x: pdfX,
           y: pdfY - scaledHeight, // Adjust for image positioning
           width: scaledWidth,
           height: scaledHeight,

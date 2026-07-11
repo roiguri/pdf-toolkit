@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Highlighter } from 'lucide-react';
 
@@ -17,6 +18,8 @@ const COLORS = [
 ];
 
 const TextSelectionMenu: React.FC<TextSelectionMenuProps> = ({ position, onHighlight, onClose }) => {
+  const { t } = useTranslation('pdf-viewer');
+
   if (!position) return null;
 
   return (
@@ -29,7 +32,7 @@ const TextSelectionMenu: React.FC<TextSelectionMenuProps> = ({ position, onHighl
       }}
     >
       <div className="flex items-center gap-1 p-1">
-        <span className="text-xs font-medium mr-1">Highlight:</span>
+        <span className="text-xs font-medium me-1">{t('highlightLabel')}</span>
         {COLORS.map((color) => (
           <button
             key={color.name}

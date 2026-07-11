@@ -99,6 +99,15 @@
     "includeHighlights": "Include Highlights",
     "clearSignatures": "Clear Signatures",
     "export": "Export",
+    "signatureModal": {
+      "title": "Draw Your Signature",
+      "close": "Close",
+      "savedSignature": "Saved Signature",
+      "useSaved": "Use Saved",
+      "saveToProfile": "Save to Profile",
+      "clear": "Clear",
+      "addNew": "Add New"
+    },
     "toasts": {
       "signatureSaved": "Signature saved to profile",
       "signatureFailed": "Failed to save signature to profile",

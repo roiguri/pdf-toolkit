@@ -32,8 +32,27 @@ function downloadBlob(blob: Blob, filename: string) {
 
 // --- Corner handle drag logic ---
 
-const MAG_SIZE = 160; // magnifier window px
-const MAG_ZOOM = 4;   // zoom factor
+const MAG_SIZE_DEFAULT = 160; // magnifier window px, `sm` and up
+const MAG_SIZE_SM = 112;      // magnifier window px, below `sm` (matches Tailwind's 640px breakpoint)
+const MAG_ZOOM = 4;           // zoom factor
+
+/** Tracks which magnifier size applies, so the one constant backs both the div's
+ * rendered size and the background-position math instead of hardcoding it twice. */
+function useMagnifierSize(): number {
+  const getSize = () =>
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 640px)').matches
+      ? MAG_SIZE_DEFAULT
+      : MAG_SIZE_SM;
+  const [size, setSize] = useState(getSize);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 640px)');
+    const update = () => setSize(getSize());
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return size;
+}
 
 interface MagnifierProps {
   previewUrl: string;
@@ -43,16 +62,17 @@ interface MagnifierProps {
 }
 
 function Magnifier({ previewUrl, corner, origWidth, origHeight }: MagnifierProps) {
+  const magSize = useMagnifierSize();
   const bgW = origWidth * MAG_ZOOM;
   const bgH = origHeight * MAG_ZOOM;
-  const bgX = -(corner[0] * MAG_ZOOM - MAG_SIZE / 2);
-  const bgY = -(corner[1] * MAG_ZOOM - MAG_SIZE / 2);
+  const bgX = -(corner[0] * MAG_ZOOM - magSize / 2);
+  const bgY = -(corner[1] * MAG_ZOOM - magSize / 2);
   return (
     <div
       className="absolute top-2 end-2 rounded-lg border-2 border-blue-500 overflow-hidden shadow-xl pointer-events-none"
       style={{
-        width: MAG_SIZE,
-        height: MAG_SIZE,
+        width: magSize,
+        height: magSize,
         backgroundImage: `url(${previewUrl})`,
         backgroundSize: `${bgW}px ${bgH}px`,
         backgroundPosition: `${bgX}px ${bgY}px`,
@@ -78,9 +98,8 @@ interface CornerHandlesProps {
   onChange: (corners: [Corner, Corner, Corner, Corner]) => void;
 }
 
-/** Compute the pixel rect of the image rendered with object-contain inside the container. */
-function getImageRect(containerEl: HTMLDivElement, origWidth: number, origHeight: number) {
-  const { width: cw, height: ch } = containerEl.getBoundingClientRect();
+/** Compute the pixel rect of the image rendered with object-contain inside a `cw`x`ch` container. */
+function getImageRect(cw: number, ch: number, origWidth: number, origHeight: number) {
   const containerAspect = cw / ch;
   const imageAspect = origWidth / origHeight;
   let iw: number, ih: number, ox: number, oy: number;
@@ -102,15 +121,42 @@ function getImageRect(containerEl: HTMLDivElement, origWidth: number, origHeight
 // movement, so it moves 1:1 as seen inside the magnifier.
 const DRAG_SENSITIVITY = 1 / MAG_ZOOM;
 
+// Touch-friendly hit area for corner handles (~44px), independent of the smaller visible dot.
+const HANDLE_HIT_SIZE = 44;
+
 interface DragStart { px: number; py: number; cx: number; cy: number }
 
 function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl, onChange }: CornerHandlesProps) {
   const dragging = useRef<number | null>(null);
   const dragStart = useRef<DragStart | null>(null);
   const [activeCorner, setActiveCorner] = useState<Corner | null>(null);
+  // Re-measured on every container resize so getImageRect/toDisplay stay in sync
+  // with the live layout instead of a stale measurement from a previous render.
+  const [containerSize, setContainerSize] = useState(() => {
+    const { width, height } = containerEl.getBoundingClientRect();
+    return { width, height };
+  });
+
+  useEffect(() => {
+    const measure = () => {
+      // The geometry a drag started with may no longer apply once the
+      // container resizes mid-drag; cancel it rather than risk a jump.
+      if (dragging.current !== null) {
+        dragging.current = null;
+        dragStart.current = null;
+        setActiveCorner(null);
+      }
+      const { width, height } = containerEl.getBoundingClientRect();
+      setContainerSize({ width, height });
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(containerEl);
+    return () => observer.disconnect();
+  }, [containerEl]);
 
   const toDisplay = (corner: Corner): { x: number; y: number } => {
-    const { iw, ih, ox, oy } = getImageRect(containerEl, origWidth, origHeight);
+    const { iw, ih, ox, oy } = getImageRect(containerSize.width, containerSize.height, origWidth, origHeight);
     return { x: ox + (corner[0] / origWidth) * iw, y: oy + (corner[1] / origHeight) * ih };
   };
 
@@ -125,7 +171,7 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
   const onPointerMove = useCallback((e: PointerEvent) => {
     if (dragging.current === null || !dragStart.current) return;
     const idx = dragging.current;
-    const { iw, ih } = getImageRect(containerEl, origWidth, origHeight);
+    const { iw, ih } = getImageRect(containerSize.width, containerSize.height, origWidth, origHeight);
     // Convert pointer delta (display px) → original image px, scaled by sensitivity
     const dx = (e.clientX - dragStart.current.px) * (origWidth / iw) * DRAG_SENSITIVITY;
     const dy = (e.clientY - dragStart.current.py) * (origHeight / ih) * DRAG_SENSITIVITY;
@@ -137,8 +183,7 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
     next[idx] = newCorner;
     setActiveCorner(newCorner);
     onChange(next);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [corners, origWidth, origHeight, containerEl, onChange]);
+  }, [corners, origWidth, origHeight, containerSize, onChange]);
 
   const onPointerUp = useCallback(() => {
     dragging.current = null;
@@ -155,7 +200,7 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
     };
   }, [onPointerMove, onPointerUp]);
 
-  const { width = 0, height = 0 } = containerEl.getBoundingClientRect();
+  const { width = 0, height = 0 } = containerSize;
 
   const pts = corners.map(toDisplay);
   const polygonPts = pts.map(p => `${p.x},${p.y}`).join(' ');
@@ -177,14 +222,17 @@ function CornerHandles({ corners, origWidth, origHeight, containerEl, previewUrl
         />
       </svg>
 
-      {/* Corner handles */}
+      {/* Corner handles — the visible dot stays small; the hit area is enlarged to
+          a touch-friendly ~44px, centered on the same anchor point as the dot. */}
       {pts.map((p, i) => (
         <div
           key={i}
           onPointerDown={onPointerDown(i)}
-          className="absolute w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-md cursor-grab active:cursor-grabbing touch-none"
-          style={{ left: p.x - 10, top: p.y - 10, zIndex: 10 }}
-        />
+          className="absolute flex items-center justify-center cursor-grab active:cursor-grabbing touch-none"
+          style={{ left: p.x - HANDLE_HIT_SIZE / 2, top: p.y - HANDLE_HIT_SIZE / 2, width: HANDLE_HIT_SIZE, height: HANDLE_HIT_SIZE, zIndex: 10 }}
+        >
+          <div className="w-5 h-5 rounded-full bg-blue-500 border-2 border-white shadow-md pointer-events-none" />
+        </div>
       ))}
 
       {/* Magnifier — shown while dragging a corner */}
@@ -213,6 +261,14 @@ const ScanTool = () => {
   const currentIdx = images.length - 1; // index of the image being adjusted
   const current = images[currentIdx] ?? null;
   const { t } = useTranslation('tools');
+
+  // Shared labels: buttons collapse to icon-only below `sm`, so these double
+  // as the visible label (large screens) and the accessible name / tooltip
+  // (icon-only, small screens).
+  const backLabel = t('scan.back', { ns: 'common' });
+  const backToAdjustLabel = t('scan.backToAdjust');
+  const addAnotherLabel = t('scan.addAnother');
+  const scanLabel = t('scan.scanButton', { count: images.length });
 
   const handleFileSelect = async (file: File) => {
     if (!file.type.startsWith('image/')) {
@@ -369,13 +425,15 @@ const ScanTool = () => {
 
         {images.length > 0 && (
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => { setStep('adjust'); }}>
-              <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" /> {t('scan.backToAdjust')}
+            <Button variant="outline" onClick={() => { setStep('adjust'); }} title={backToAdjustLabel} aria-label={backToAdjustLabel}>
+              <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> <span className="hidden sm:inline">{backToAdjustLabel}</span>
             </Button>
-            <Button onClick={handleScan} disabled={isScanning}>
-              {isScanning && <Loader2 className="me-2 h-4 w-4 animate-spin" />}
-              <ScanLine className="me-2 h-4 w-4" />
-              {t('scan.scanButton', { count: images.length })}
+            <Button onClick={handleScan} disabled={isScanning} title={scanLabel} aria-label={scanLabel}>
+              {isScanning
+                ? <Loader2 className="h-4 w-4 animate-spin" />
+                : <ScanLine className="h-4 w-4" />}
+              <span className="hidden sm:inline">{scanLabel}</span>
+              <span className="sm:hidden">{images.length}</span>
             </Button>
           </div>
         )}
@@ -416,17 +474,18 @@ const ScanTool = () => {
       </div>
 
       <div className="flex gap-2 flex-shrink-0">
-        <Button variant="outline" onClick={handleBack}>
-          <ArrowLeft className="me-2 h-4 w-4 rtl:rotate-180" /> {t('scan.back', { ns: 'common' })}
+        <Button variant="outline" onClick={handleBack} title={backLabel} aria-label={backLabel}>
+          <ArrowLeft className="h-4 w-4 rtl:rotate-180" /> <span className="hidden sm:inline">{backLabel}</span>
         </Button>
-        <Button variant="outline" onClick={handleAddAnother}>
-          <PlusCircle className="me-2 h-4 w-4" /> {t('scan.addAnother')}
+        <Button variant="outline" onClick={handleAddAnother} title={addAnotherLabel} aria-label={addAnotherLabel}>
+          <PlusCircle className="h-4 w-4" /> <span className="hidden sm:inline">{addAnotherLabel}</span>
         </Button>
-        <Button onClick={handleScan} disabled={isScanning}>
+        <Button onClick={handleScan} disabled={isScanning} title={scanLabel} aria-label={scanLabel}>
           {isScanning
-            ? <Loader2 className="me-2 h-4 w-4 animate-spin" />
-            : <ScanLine className="me-2 h-4 w-4" />}
-          {t('scan.scanButton', { count: images.length })}
+            ? <Loader2 className="h-4 w-4 animate-spin" />
+            : <ScanLine className="h-4 w-4" />}
+          <span className="hidden sm:inline">{scanLabel}</span>
+          <span className="sm:hidden">{images.length}</span>
         </Button>
       </div>
     </div>

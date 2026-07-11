@@ -61,18 +61,18 @@ const ActionToolbar = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="w-[200px] justify-between">
-          <span className="flex items-center gap-2">
-            {activeMode === 'view' && <Eye className="h-4 w-4" />}
-            {activeMode === 'split' && <SplitSquareVertical className="h-4 w-4" />}
-            {activeMode === 'merge' && <Combine className="h-4 w-4" />}
-            {activeMode === 'convert' && <Image className="h-4 w-4" />}
-            {activeMode === 'edit' && <PenLine className="h-4 w-4" />}
-            {activeMode === 'compress' && <Shrink className="h-4 w-4" />}
-            {activeMode === 'scan' && <ScanLine className="h-4 w-4" />}
-            {getActiveModeLabel()}
+        <Button variant="outline" className="w-auto min-w-0 max-w-[200px] shrink justify-between">
+          <span className="flex items-center gap-2 min-w-0">
+            {activeMode === 'view' && <Eye className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'split' && <SplitSquareVertical className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'merge' && <Combine className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'convert' && <Image className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'edit' && <PenLine className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'compress' && <Shrink className="h-4 w-4 flex-shrink-0" />}
+            {activeMode === 'scan' && <ScanLine className="h-4 w-4 flex-shrink-0" />}
+            <span className="truncate">{getActiveModeLabel()}</span>
           </span>
-          <ChevronDown className="h-4 w-4 opacity-50" />
+          <ChevronDown className="h-4 w-4 opacity-50 flex-shrink-0" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-[200px]" align="start">

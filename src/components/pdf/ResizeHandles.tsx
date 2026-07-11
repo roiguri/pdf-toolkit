@@ -60,8 +60,11 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
     };
   }, [activeHandle, startPos, onResize, onResizeEnd]);
 
-  // Handle size adjusted for scale (but capped to prevent being too small)
-  const handleSize = Math.max(8, 10 * Math.min(scale, 1));
+  // Visible dot size adjusted for scale (but capped to prevent being too small)
+  const dotSize = Math.max(8, 10 * Math.min(scale, 1));
+  // Invisible hit area is fixed and larger than the dot for touch targets,
+  // independent of scale, centered on the same corner point as the dot.
+  const hitAreaSize = 36;
 
   const handles: { position: ResizeHandle; style: React.CSSProperties; cursor: string }[] = [
     {
@@ -91,16 +94,21 @@ const ResizeHandles: React.FC<ResizeHandlesProps> = ({
       {handles.map(({ position, style, cursor }) => (
         <div
           key={position}
-          className="absolute bg-white border border-gray-600"
+          className="absolute flex items-center justify-center"
           style={{
-            width: handleSize,
-            height: handleSize,
+            width: hitAreaSize,
+            height: hitAreaSize,
             cursor,
             touchAction: 'none', // Prevent scrolling while resizing
             ...style,
           }}
           onPointerDown={(e) => handlePointerDown(e, position)}
-        />
+        >
+          <div
+            className="bg-white border border-gray-600 pointer-events-none"
+            style={{ width: dotSize, height: dotSize }}
+          />
+        </div>
       ))}
     </>
   );

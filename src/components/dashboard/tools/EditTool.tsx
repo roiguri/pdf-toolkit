@@ -129,17 +129,7 @@ const EditTool = ({ file }: EditToolProps) => {
     try {
       toast.info(t('edit.toasts.exporting'), { id: 'export-pdf' });
 
-      const pagesDimensions = viewerRef.current?.pagesDimensions ?? {};
-      const scale = viewerRef.current?.scale ?? 1;
-      const firstPageDims = pagesDimensions[1] || Object.values(pagesDimensions)[0];
-
-      if (!firstPageDims) throw new Error('Page dimensions not available');
       if (!file.downloadURL) throw new Error('File URL is missing');
-
-      const unscaledDimensions = {
-        width: firstPageDims.width / scale,
-        height: firstPageDims.height / scale,
-      };
 
       const filteredAnnotations = annotations.filter(a =>
         a.type === 'signature' || a.type === 'text' ||
@@ -149,7 +139,6 @@ const EditTool = ({ file }: EditToolProps) => {
       const pdfBytes = await embedAnnotationsInPdf(
         file.downloadURL,
         filteredAnnotations,
-        unscaledDimensions,
         bookmarks,
       );
 
